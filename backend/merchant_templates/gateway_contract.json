@@ -1,0 +1,18 @@
+{
+  "name": "SimPay mock gateway callback contract v1",
+  "signature": "HMAC-SHA256 over canonical JSON (sorted keys, no spaces), hex, header X-SimPay-Signature",
+  "callback_fields": ["event_id", "txn_id", "order_id", "amount", "status", "timestamp"],
+  "status_to_order_state": {
+    "SUCCESS": "PAID",
+    "PENDING": "PAYMENT_PENDING",
+    "FAILED": "PAYMENT_FAILED"
+  },
+  "final_order_states": ["PAID", "PAYMENT_FAILED"],
+  "rules": [
+    "PENDING is a non-final state; a later callback will carry SUCCESS or FAILED.",
+    "Callbacks may be delivered more than once with the same event_id; process each event_id once.",
+    "Reject callbacks whose signature does not verify.",
+    "Never move an order out of a final state.",
+    "Any status not listed in status_to_order_state is unknown: do NOT change the order and do NOT mark the event processed; respond with a non-2xx error so the gateway retries after the merchant is updated."
+  ]
+}

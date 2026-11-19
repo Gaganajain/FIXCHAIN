@@ -1,0 +1,12 @@
+.env
+backend/workspace/
+__pycache__/
+*.pyc
+.venv/
+node_modules/
+frontend/dist/
+.pytest_cache/
+*.tsbuildinfo
+*.log
+.vercel/
+.env.local
