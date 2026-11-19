@@ -164,3 +164,35 @@ def test_webhook_secret_persists_across_restarts(tmp_path, monkeypatch):
     assert (tmp_path / ".webhook_secret").read_text().strip() == first
     monkeypatch.setenv("GATEWAY_WEBHOOK_SECRET", "from-env")
     assert config._webhook_secret() == "from-env"
+
+
+# ---------------------------------------------------------------- deployment cost guard
+def test_llm_run_cap_falls_back_to_labelled_offline(client, monkeypatch):
+    from app.agents import llm
+
+    def down(**kw):
+        raise llm.LLMError("provider unavailable in test")
+
+    monkeypatch.setattr(llm, "structured_call", down)
+    monkeypatch.setattr(config, "agent_mode", lambda: "llm")
+    monkeypatch.setattr(config, "llm_label", lambda: "Sarvam · test")
+    monkeypatch.setattr(config, "MAX_LLM_RUNS_PER_HOUR", 1)
+    inc, run, patch = _awaiting(client)      # uses the one allowed LLM-mode run
+    assert run["agent_mode"] == "llm"
+    client.post(f"/api/patches/{patch['id']}/reject", json={"note": "cleanup"})
+    assert client.post(f"/api/incidents/{inc}/run").status_code == 200
+    d = wait_state(client, inc, ("AWAITING_APPROVAL", "FAILED"))
+    assert d["runs"][0]["agent_mode"] == "offline"
+    assert "limit of 1/hour" in d["runs"][0]["agent_label"]
+    client.post(f"/api/patches/{d['runs'][0]['patches'][-1]['id']}/reject", json={"note": "cleanup"})
+
+
+def test_cors_origins_from_env(monkeypatch):
+    import importlib
+    monkeypatch.setenv("FIXCHAIN_CORS_ORIGINS", "https://fixchain.vercel.app/, https://x.example")
+    cfg = importlib.reload(config)
+    try:
+        assert "https://fixchain.vercel.app" in cfg.CORS_ORIGINS and "https://x.example" in cfg.CORS_ORIGINS
+    finally:
+        monkeypatch.delenv("FIXCHAIN_CORS_ORIGINS")
+        importlib.reload(config)
