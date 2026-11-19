@@ -23,8 +23,7 @@ async def lifespan(_app: FastAPI):
 
 app = FastAPI(title="FIXCHAIN", version="0.1.0", lifespan=lifespan,
               description="Autonomous payment-integration reliability engineer (simulated environment)")
-app.add_middleware(CORSMiddleware, allow_origins=["http://localhost:5173", "http://127.0.0.1:5173"],
-                   allow_methods=["*"], allow_headers=["*"])
+app.add_middleware(CORSMiddleware, allow_origins=config.CORS_ORIGINS, allow_methods=["*"], allow_headers=["*"])
 
 
 # ------------------------------------------------------------------ models

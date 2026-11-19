@@ -1,0 +1,43 @@
+# Render Blueprint for the FIXCHAIN API (FastAPI). Render dashboard: New + -> Blueprint -> this repo.
+# The dashboard (frontend/) is deployed separately on Vercel and proxies /api to this service.
+services:
+  - type: web
+    name: fixchain-api
+    runtime: python
+    plan: free
+    rootDir: backend
+    buildCommand: pip install -r requirements.txt
+    # One process only: the pipeline runs in a background thread and shares an in-process lock + SQLite file.
+    startCommand: uvicorn app.main:app --host 0.0.0.0 --port $PORT --workers 1
+    healthCheckPath: /api/status
+    autoDeploy: true
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.12.10
+      # ---- LLM provider: enter your key in the Render dashboard (never commit it). Leave empty for offline agents.
+      - key: SARVAM_API_KEY
+        sync: false
+      - key: SARVAM_MODEL
+        value: sarvam-105b
+      - key: SARVAM_REASONING_EFFORT
+        value: medium
+      - key: ANTHROPIC_API_KEY
+        sync: false
+      - key: FIXCHAIN_LLM_PROVIDER
+        value: auto
+      - key: FIXCHAIN_AGENT_MODE
+        value: auto
+      # ---- safety for a public URL
+      - key: FIXCHAIN_REVIEWER_TOKEN      # required to approve / reject / rollback / reconcile / close
+        generateValue: true
+      - key: GATEWAY_WEBHOOK_SECRET       # stable HMAC secret for the simulated gateway
+        generateValue: true
+      - key: FIXCHAIN_MAX_LLM_RUNS_PER_HOUR   # cost guard: extra runs use the labelled offline agents
+        value: "20"
+      - key: FIXCHAIN_AUTO_INVESTIGATE
+        value: "true"
+      - key: FIXCHAIN_MAX_REPAIR_ATTEMPTS
+        value: "3"
+      # Only needed if the dashboard calls this URL directly instead of through the Vercel /api proxy.
+      - key: FIXCHAIN_CORS_ORIGINS
+        sync: false

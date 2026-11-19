@@ -108,6 +108,15 @@ def agent_mode() -> str:
     return "llm" if llm_provider() else "offline"
 
 
-AUTO_INVESTIGATE = os.getenv("FIXCHAIN_AUTO_INVESTIGATE", "true").lower() == "true"
+# Browser origins allowed to call the API directly. The hosted dashboard normally proxies /api through
+# Vercel (same origin), so this is only needed if the frontend calls the backend URL directly.
+CORS_ORIGINS = ["http://localhost:5173", "http://127.0.0.1:5173"] + [
+    o.strip().rstrip("/") for o in os.getenv("FIXCHAIN_CORS_ORIGINS", "").split(",") if o.strip()]
+
+# Cost guard for public deployments: at most this many LLM-mode pipeline runs per rolling hour; further runs
+# use the labelled offline agents. 0 disables the cap.
+MAX_LLM_RUNS_PER_HOUR = int(os.getenv("FIXCHAIN_MAX_LLM_RUNS_PER_HOUR", "0"))
+
+AUTO_INVESTIGATE =os.getenv("FIXCHAIN_AUTO_INVESTIGATE", "true").lower() == "true"
 MAX_REPAIR_ATTEMPTS = int(os.getenv("FIXCHAIN_MAX_REPAIR_ATTEMPTS", "3"))
 VERIFIER_TIMEOUT_S = int(os.getenv("FIXCHAIN_VERIFIER_TIMEOUT", "60"))

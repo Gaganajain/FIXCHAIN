@@ -134,3 +134,29 @@ To run the verifier suite directly against any handler directory:
 ```bash
 FIXCHAIN_TARGET_DIR=merchant_templates .venv/Scripts/python -m pytest verifier_suite -q
 ```
+
+## Deploy (Render backend + Vercel dashboard)
+
+The API needs a long-running process: background pipeline threads, a SQLite file and pytest subprocesses.
+Serverless functions don't support those, so the backend runs on **Render** and the static dashboard on **Vercel**.
+Vercel proxies `/api/*` to Render (`frontend/vercel.json`), so the browser only talks to one origin.
+
+### 1. Backend on Render
+1. Render dashboard → **New + → Blueprint** → connect this GitHub repo. Render reads `render.yaml`.
+2. When prompted, enter `SARVAM_API_KEY` (or `ANTHROPIC_API_KEY`). Leave both empty to run the labelled offline agents.
+3. Deploy, then open `https://<service>.onrender.com/api/status`. It should return `"environment": "SIMULATED"`.
+4. Copy the generated **`FIXCHAIN_REVIEWER_TOKEN`** from the service's *Environment* tab. Reviewers paste it into the
+   dashboard's top bar to approve, reject, roll back, reconcile or close.
+
+Free-tier notes:
+- The service sleeps when idle; the first request can take about 50 s, and the dashboard retries on its own.
+- Its disk is temporary, so demo data resets on restart. Incident memory is kept only while the instance lives.
+- `FIXCHAIN_MAX_LLM_RUNS_PER_HOUR` (default 20 in `render.yaml`) caps paid LLM runs. Extra runs use the offline agents
+  and are labelled as such.
+
+### 2. Dashboard on Vercel
+1. Vercel → **Add New → Project** → import this repo → set **Root Directory** to `frontend`.
+   Framework, build command and output come from `frontend/vercel.json`.
+2. If your Render URL isn't `https://fixchain-api.onrender.com`, edit the `/api` rewrite in `frontend/vercel.json`
+   and push.
+3. Deploy, open the Vercel URL, enter a reviewer name and the token, and run the demo script.

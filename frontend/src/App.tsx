@@ -92,7 +92,9 @@ export default function App() {
                 <Badge tone="accent">Run #{status.active_run.id}: {status.active_run.state.replace("_", " ").toLowerCase()}</Badge>
               </button>
             )}
-            {error && <Badge tone="critical">API unreachable — is the backend running on :8000?</Badge>}
+            {error && <Badge tone="critical">{["localhost", "127.0.0.1"].includes(location.hostname)
+              ? "API unreachable — is the backend running on :8000?"
+              : "API unreachable — the backend may be waking up (free hosting sleeps when idle). Retrying…"}</Badge>}
           </div>
         </header>
         <main className="min-w-0 flex-1 p-4 md:p-6">

@@ -91,6 +91,11 @@ def start_run(incident_id: int) -> int:
                              "Check the gateway configuration, then close the incident.")
         mode = config.agent_mode()
         label = config.llm_label() if mode == "llm" else "offline deterministic"
+        if mode == "llm" and config.MAX_LLM_RUNS_PER_HOUR > 0:
+            used = db.one("SELECT COUNT(*) AS n FROM runs WHERE agent_mode='llm' AND started_at>=?",
+                          (db.now() - 3600,))["n"]
+            if used >= config.MAX_LLM_RUNS_PER_HOUR:
+                mode, label = "offline", f"offline deterministic (LLM limit of {config.MAX_LLM_RUNS_PER_HOUR}/hour reached)"
         with db.tx() as c:
             cur = c.execute("INSERT INTO runs (incident_id, state, agent_mode, agent_label, started_at)"
                             " VALUES (?,?,?,?,?)", (incident_id, "QUEUED", mode, label, db.now()))
