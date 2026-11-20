@@ -1,162 +1,194 @@
-# FIXCHAIN — Autonomous Payment Integration Reliability Engineer
+<div align="center">
 
-FIXCHAIN detects, investigates, repairs and verifies payment-integration bugs in a **simulated**
-merchant environment, then asks a human to approve the fix. No real money moves and nothing
-connects to a real gateway.
+# FIXCHAIN
 
-## Architecture
+**The autonomous reliability engineer for payment integrations.**
 
+Detects, diagnoses, patches and verifies merchant-side payment bugs, before a paid order turns into a refund and a support ticket.
+
+[![Live demo](https://img.shields.io/badge/live%20demo-fixchain.vercel.app-00BAF2?style=for-the-badge)](https://fixchain.vercel.app)
+[![Landing page](https://img.shields.io/badge/overview-landing%20page-002E6E?style=for-the-badge)](https://fixchain.vercel.app/landing)
+
+![Python](https://img.shields.io/badge/Python-3.12-002E6E?logo=python&logoColor=white)
+![FastAPI](https://img.shields.io/badge/FastAPI-backend-002E6E?logo=fastapi&logoColor=white)
+![React](https://img.shields.io/badge/React-18-002E6E?logo=react&logoColor=white)
+![Tests](https://img.shields.io/badge/backend%20tests-37%20passing-0B7A33)
+![Verifier](https://img.shields.io/badge/verifier%20suite-22%20tests-0B7A33)
+
+*Built for Paytm merchants · independent hackathon project, not an official Paytm product · the demo uses a simulated gateway and moves no real money.*
+
+</div>
+
+---
+
+## The problem
+
+A customer pays ₹1,299. The bank is still confirming, so the gateway reports **PENDING**. A small bug in the merchant’s callback handler treats PENDING as **FAILED**. The money arrives a minute later, but the order is already final, so it stays failed.
+
+The customer was charged with no order, the merchant raises a ticket, and the gateway gets the blame for a bug in code it doesn’t own. Today these bugs are found by customers and fixed by support tickets.
+
+## What FIXCHAIN does
+
+```mermaid
+flowchart LR
+    A["Detect<br/><sub>contract check on every callback</sub>"] --> B["Reproduce<br/><sub>replay in a sandbox</sub>"]
+    B --> C["Investigate<br/><sub>AI: root cause + evidence</sub>"]
+    C --> D["Patch<br/><sub>AI: minimal fix, sandbox only</sub>"]
+    D --> E{"Verify<br/><sub>locked 22-test suite</sub>"}
+    E -- fails --> D
+    E -- passes --> F["Approve<br/><sub>named human reviewer</sub>"]
+    F --> G["Reconcile<br/><sub>re-sync orders from the gateway</sub>"]
+
+    classDef ai fill:#EAF7FE,stroke:#00BAF2,color:#002E6E;
+    classDef rules fill:#FFFFFF,stroke:#002E6E,color:#002E6E;
+    classDef human fill:#FFF6E5,stroke:#F5A623,color:#002E6E;
+    class C,D ai;
+    class A,B,E,G rules;
+    class F human;
 ```
- Simulator (checkout) ──► SimPay mock gateway ──HMAC-signed callback──► Merchant runtime
-                                   ▲                                    (live payment_handler.py)
-                     authoritative │                                          │ payment_events / app_logs
-                       status API  │                                          ▼
-                                   │                              Detection monitor (deterministic,
-                                   │                              contract-based) ──► Incident
-                                   │                                          │
-                                   │                     Orchestrator (explicit state machine)
-                                   │      ┌──────────────┬──────────────┬─────┴────────┬──────────────┐
-                                   │   REPRODUCE     INVESTIGATE       REPAIR         VERIFY        APPROVAL
-                                   │   (verifier)   (Claude / AST)  (Claude/contract) (locked pytest  (human)
-                                   │                                  in sandbox +    suite, subprocess)
-                                   │                                  policy gate)          │
-                                   └──────── reconcile affected orders ◄── activate in simulated env
-```
 
-| Layer | Tech | Where |
+**AI where judgement helps** (diagnosing and writing the fix). **Deterministic rules wherever money is involved** (detecting, verifying, reconciling). Nothing goes live without a person’s approval.
+
+## Proof it works
+
+Measured on our own runs (19–20 Nov 2026), not projected:
+
+| | |
+|---|---|
+| **22/22** | independent tests pass on the verified fix, up from 10/22 on the buggy code |
+| **5/5** | live AI runs ended in a verified fix, with every affected order back in sync |
+| **~20 s** | from an injected bug to a verified patch on the deployed app |
+| **2** | wrong AI patches caught by the verifier (11/22 and 15/22 tests) and never shipped |
+| **37** | automated backend tests |
+
+## Why it’s safe to roll out
+
+- **AI never decides a payment.** Order states change only when the merchant’s code processes a signed gateway callback.
+- **Independent verifier.** A locked pytest suite the AI can’t read or edit; its SHA-256 is pinned at startup and checked before every run, in a separate process with secrets stripped.
+- **Sandboxed, allow-listed fixes.** Patches are written in an isolated copy, limited to approved files, and pass a static gate (compiles, allowed imports only, no undefined names, public interface intact).
+- **Validated AI answers.** A root cause must name a real function that can produce the observed state, with concrete evidence; placeholder answers are rejected and the run falls back to a labelled rule-based analysis.
+- **Named human approval.** Approve, reject, rollback, reconcile and close all require a reviewer name (and optionally a token), recorded in the audit trail.
+- **Knows what isn’t a bug.** Forged or mis-signed callbacks become an *external* incident; FIXCHAIN refuses to patch code that isn’t broken.
+- **Scrubbed data.** Keys, signatures, card-like numbers and emails are removed from logs before any AI model sees them.
+
+## Try it in 2 minutes
+
+1. Open the [live demo](https://fixchain.vercel.app) and enter a reviewer name in the top bar. *(The free backend may take up to a minute to wake.)*
+2. **Simulator** → *Inject PENDING→FAILED bug* → click **PENDING**. The order is wrongly marked `PAYMENT_FAILED`.
+3. **Incidents** → watch the agents work: root cause with evidence, the code diff, tests going from 10/22 to 22/22.
+4. **Approve & activate** (requires the reviewer token on the hosted demo), then **Reconcile** the affected orders.
+5. **Overview** → integration health back to 100%.
+6. Bonus: *Send forged callback* three times → an external incident appears, and no patch is attempted.
+
+## Tech stack
+
+| Layer | Technology | Where |
 |---|---|---|
-| API + orchestration | FastAPI, SQLite, threads | `backend/app/` |
-| Agents | Claude (`claude-opus-5-5`, JSON-schema structured outputs) or offline deterministic mode | `backend/app/agents/` |
-| Independent verifier suite | pytest (22 tests: success/failed/pending, duplicates, signatures, unknown statuses, HTTP) | `backend/verifier_suite/` |
-| Simulated merchant code | the file FIXCHAIN repairs | `backend/merchant_templates/` → live copy in `backend/workspace/merchant_active/` |
-| Dashboard | React + TypeScript + Tailwind + Recharts (Vite) | `frontend/` |
+| API and orchestration | FastAPI, SQLite (WAL), a background state machine | `backend/app/` |
+| AI agents | Sarvam AI or Claude with JSON-schema outputs, plus an offline rule-based fallback | `backend/app/agents/` |
+| Independent verifier | pytest, 22 payment-correctness tests, results parsed from JUnit XML | `backend/verifier_suite/` |
+| Simulated merchant | the callback handler FIXCHAIN repairs | `backend/merchant_templates/` |
+| Dashboard | React 18, TypeScript, Tailwind, Recharts (Vite) | `frontend/` |
+| Hosting | Render (API) and Vercel (dashboard, `/api` proxy) | `render.yaml`, `frontend/vercel.json` |
 
-**Agent modes.** With `ANTHROPIC_API_KEY` set, the investigator and repairer call Claude. Without one,
-they run in a clearly labelled *offline deterministic* mode (AST analysis + a contract-based repair). In
-both modes the detection and verification are deterministic and the results are real: patches are
-real code, tests really run, and the UI shows which mode produced each result.
+<details>
+<summary><b>Project structure</b></summary>
 
-## Safety guarantees (enforced in code)
+```
+fixchain/
+├── backend/
+│   ├── app/
+│   │   ├── main.py              # FastAPI routes
+│   │   ├── orchestrator.py      # pipeline state machine, approvals, reconciliation
+│   │   ├── detection.py         # contract-based incident detection
+│   │   ├── gateway.py           # simulated gateway (HMAC-signed callbacks)
+│   │   ├── merchant_runtime.py  # loads and versions the merchant handler
+│   │   ├── memory.py            # incident memory
+│   │   └── agents/              # investigator, repairer, verifier, LLM wrapper, sanitiser
+│   ├── merchant_templates/      # the simulated merchant code + gateway contract
+│   ├── verifier_suite/          # locked, independent test suite
+│   └── tests/                   # backend tests (offline, isolated)
+├── frontend/
+│   ├── src/                     # React dashboard (agent control room)
+│   ├── public/landing.html      # landing page
+│   └── vercel.json
+└── render.yaml
+```
+</details>
 
-- Simulated gateway only; HMAC secret comes from env and is **never** sent to the LLM (logs are sanitised:
-  signatures, keys, card-like numbers and emails are redacted).
-- Logs and source are wrapped as `<untrusted_data>`; the model is told to treat them as data.
-- The repair agent edits only allowlisted files (`payment_handler.py`) inside `workspace/sandboxes/run_N/`.
-- Static policy gate: must compile, no imports beyond hashing/json, no `eval/exec/open/...`, no undefined names,
-  public interface intact.
-- Investigation quality gate: an LLM investigation is rejected if any field is a placeholder (e.g. `"..."`), it has
-  no concrete evidence, or it names a function that cannot produce the observed order state. Rejected answers are
-  retried once with the reasons; after that (or if the provider is down) the labelled offline AST analysis is used.
-- "No code defect" path: if the current code passes every independent test for an incident, the run ends as
-  `NOT_REPRODUCIBLE` (no patch). The incident resolves itself if orders already match the gateway, otherwise it is
-  marked `needs_reconciliation`. Incidents are re-checked after every run and decision.
-- Verifier suite lives outside every sandbox; its SHA-256 is pinned at startup and re-checked before each run.
-  Tests run in a subprocess with secrets stripped from the environment; results are parsed from JUnit XML.
-- Activation requires: patch status `verified`, a passing test record, unchanged live code, **and** human approval.
-- Order states are only ever changed by the merchant handler processing signed gateway callbacks — never by AI.
-- Every decision that changes the simulated live environment (approve, reject, rollback, reconcile, close) needs a
-  reviewer name, entered in the top bar and sent as `X-Reviewer`, which is recorded in the audit trail. Set
-  `FIXCHAIN_REVIEWER_TOKEN` to also require a token.
-- External incidents (e.g. 3+ invalid callback signatures within 120 s) are classified as *not a merchant code defect*:
-  no patch is generated, and a reviewer closes them after checking the gateway side.
-- With `GATEWAY_WEBHOOK_SECRET` empty, a secret is generated once and kept in `workspace/.webhook_secret`.
+## Run locally
 
-## Setup (Windows, PowerShell or Git Bash)
+**Backend** (API on `:8000`)
 
 ```bash
-cd fixchain/backend
+cd backend
 python -m venv .venv
-.venv/Scripts/python -m pip install -r requirements.txt
-copy .env.example .env        # then edit .env (optional: add ANTHROPIC_API_KEY)
-```
-
-```bash
-cd fixchain/frontend
-npm install
-```
-
-### Configuring an LLM provider (Claude or Sarvam AI)
-Put ONE key in `fixchain/backend/.env` (git-ignored) — never in source code:
-
-```
-# Claude
-ANTHROPIC_API_KEY=sk-ant-...
-# or Sarvam AI (https://dashboard.sarvam.ai)
-SARVAM_API_KEY=sk_...
-SARVAM_MODEL=sarvam-105b          # any model on Sarvam /v2/chat/completions
-```
-
-Restart the backend. The dashboard header shows the active provider, e.g. **Agents: Sarvam · sarvam-105b**.
-If both keys are set, Claude is used unless `FIXCHAIN_LLM_PROVIDER=sarvam`.
-Sarvam is called via its OpenAI-compatible `POST https://api.sarvam.ai/v2/chat/completions` with
-`response_format: json_schema`; every reply is also validated locally against the schema (one retry on
-malformed output) before an agent may use it.
-
-## Run
-
-Terminal 1 (API on :8000):
-```bash
-cd fixchain/backend
+.venv/Scripts/python -m pip install -r requirements.txt   # macOS/Linux: .venv/bin/python
+cp .env.example .env                                      # optional: add an AI provider key
 .venv/Scripts/python -m uvicorn app.main:app --port 8000
 ```
 
-Terminal 2 (dashboard on :5173):
+**Dashboard** (on `:5173`)
+
 ```bash
-cd fixchain/frontend
+cd frontend
+npm install
 npm run dev
 ```
 
-Open http://localhost:5173. API docs: http://localhost:8000/docs
+Open http://localhost:5173 (dashboard), http://localhost:5173/landing.html (landing page) or http://localhost:8000/docs (API docs).
 
-## Demo script (first milestone)
+### AI provider
 
-1. **Simulator** → *Run 20 random checkouts* (healthy baseline, no incidents).
-2. *Inject PENDING→FAILED bug*.
-3. Click **PENDING** (or run 20 more random checkouts) → order wrongly becomes `PAYMENT_FAILED`.
-4. FIXCHAIN opens an incident and auto-starts the pipeline: reproduce → investigate → patch → verify.
-5. *Settle pending payments* → customers who paid stay "failed" → a **critical** downstream incident appears.
-6. **Incidents** → review root cause, side-by-side diff, original-vs-patched test matrix → **Approve & activate**.
-7. **Reconcile** affected orders from the gateway's authoritative status. The critical downstream incident is
-   diagnosed as "no code defect" (the fixed code handles SUCCESS correctly) and closes once its orders match.
-8. **Code & history** → roll back to any version; incident memory flags the recurrence.
-9. *Send forged callback* three times → an **external** incident appears (no repair pipeline); close it with a note.
+Put **one** key in `backend/.env` (git-ignored), never in source code:
+
+```bash
+SARVAM_API_KEY=sk_...        # Sarvam AI, model set by SARVAM_MODEL (default sarvam-105b)
+# or
+ANTHROPIC_API_KEY=sk-ant-... # Claude
+```
+
+With no key, the agents run in a clearly labelled *offline* mode (AST analysis plus a contract-based repair). Detection and verification are deterministic in every mode, and the dashboard shows which mode produced each result.
 
 ## Tests
 
 ```bash
-cd fixchain/backend
-.venv/Scripts/python -m pytest -q
+cd backend
+.venv/Scripts/python -m pytest -q                                              # 37 backend tests, offline and isolated
+FIXCHAIN_TARGET_DIR=merchant_templates .venv/Scripts/python -m pytest verifier_suite -q   # verifier vs the clean handler
 ```
 
-Runs the whole milestone end to end (offline mode, isolated temp data dir).
-To run the verifier suite directly against any handler directory:
+## Deploy
 
-```bash
-FIXCHAIN_TARGET_DIR=merchant_templates .venv/Scripts/python -m pytest verifier_suite -q
-```
+The API needs a long-running process (background pipeline, a SQLite file, pytest subprocesses), so it runs on **Render**; the static dashboard runs on **Vercel**, which proxies `/api/*` to Render so the browser talks to one origin.
 
-## Deploy (Render backend + Vercel dashboard)
+1. **Render:** *New + → Blueprint* → this repo (reads `render.yaml`). Enter `SARVAM_API_KEY` when prompted, deploy, then copy the generated `FIXCHAIN_REVIEWER_TOKEN` from the service’s *Environment* tab.
+2. **Vercel:** *Add New → Project* → this repo, **Root Directory** `frontend`. If your Render URL isn’t `https://fixchain-api.onrender.com`, update the rewrite in `frontend/vercel.json`.
 
-The API needs a long-running process: background pipeline threads, a SQLite file and pytest subprocesses.
-Serverless functions don't support those, so the backend runs on **Render** and the static dashboard on **Vercel**.
-Vercel proxies `/api/*` to Render (`frontend/vercel.json`), so the browser only talks to one origin.
+<details>
+<summary><b>Configuration reference</b></summary>
 
-### 1. Backend on Render
-1. Render dashboard → **New + → Blueprint** → connect this GitHub repo. Render reads `render.yaml`.
-2. When prompted, enter `SARVAM_API_KEY` (or `ANTHROPIC_API_KEY`). Leave both empty to run the labelled offline agents.
-3. Deploy, then open `https://<service>.onrender.com/api/status`. It should return `"environment": "SIMULATED"`.
-4. Copy the generated **`FIXCHAIN_REVIEWER_TOKEN`** from the service's *Environment* tab. Reviewers paste it into the
-   dashboard's top bar to approve, reject, roll back, reconcile or close.
+| Variable | Purpose | Default |
+|---|---|---|
+| `SARVAM_API_KEY` / `ANTHROPIC_API_KEY` | AI provider key (one is enough) | none: offline mode |
+| `FIXCHAIN_LLM_PROVIDER` | `auto`, `sarvam` or `anthropic` | `auto` |
+| `FIXCHAIN_REVIEWER_TOKEN` | token required for approve / reject / rollback / reconcile / close | none: name only |
+| `FIXCHAIN_MAX_LLM_RUNS_PER_HOUR` | cost cap; extra runs use the offline agents | `0` (no cap); `20` on Render |
+| `FIXCHAIN_MAX_REPAIR_ATTEMPTS` | repair attempts per run | `3` |
+| `GATEWAY_WEBHOOK_SECRET` | HMAC secret for the simulated gateway | generated once into the data dir |
+| `FIXCHAIN_CORS_ORIGINS` | extra browser origins allowed to call the API | localhost only |
 
-Free-tier notes:
-- The service sleeps when idle; the first request can take about 50 s, and the dashboard retries on its own.
-- Its disk is temporary, so demo data resets on restart. Incident memory is kept only while the instance lives.
-- `FIXCHAIN_MAX_LLM_RUNS_PER_HOUR` (default 20 in `render.yaml`) caps paid LLM runs. Extra runs use the offline agents
-  and are labelled as such.
+Free-tier notes: Render sleeps after ~15 idle minutes (a scheduled GitHub Action, `.github/workflows/keep-warm.yml`, pings it every 10 minutes), and its disk resets on restart, so demo data is temporary.
+</details>
 
-### 2. Dashboard on Vercel
-1. Vercel → **Add New → Project** → import this repo → set **Root Directory** to `frontend`.
-   Framework, build command and output come from `frontend/vercel.json`.
-2. If your Render URL isn't `https://fixchain-api.onrender.com`, edit the `/api` rewrite in `frontend/vercel.json`
-   and push.
-3. Deploy, open the Vercel URL, enter a reviewer name and the token, and run the demo script.
+## Roadmap
+
+- Shadow-mode pilot on real webhook logs for one SDK (see the 30-day pilot plan)
+- More languages and gateway contracts beyond the Python demo handler
+- OS-level sandboxing for running patched code
+- Live push updates in the dashboard instead of polling
+- Replay of any chosen transaction in the simulator
+
+## Team
+
+[Team name] · [members and roles]
