@@ -174,7 +174,7 @@
       <a href="#proof">Proof</a>
       <a href="#who">Who it’s for</a>
     </div>
-    <a class="btn btn-primary" href="/">Try the live demo</a>
+    <a class="btn btn-primary" href="/" data-demo>Try the live demo</a>
   </div>
 </nav>
 
@@ -185,7 +185,7 @@
       <h1>Payment bugs, <em>fixed and proven</em> before customers notice.</h1>
       <p class="lead muted">When a merchant’s code mishandles a gateway callback, FIXCHAIN finds the root cause, writes the fix, proves it with an independent test suite and asks a developer to approve it.</p>
       <div class="ctas">
-        <a class="btn btn-primary" href="/">Try the live demo →</a>
+        <a class="btn btn-primary" href="/" data-demo>Try the live demo →</a>
         <a class="btn btn-ghost" href="https://github.com/Gaganajain/FIXCHAIN">View the code</a>
       </div>
       <p class="note">Simulated gateway in the demo · no real money moves</p>
@@ -298,7 +298,7 @@
     <p class="muted reveal">Week one: connect read-only webhook logs. Week two: shadow mode, detect only. Week three: verified fixes go to merchant developers. Week four: measure tickets avoided and time to fix.</p>
     <div class="ctas reveal">
       <a class="btn btn-primary" href="https://github.com/Gaganajain/FIXCHAIN/issues/new?title=Pilot%20request">Request a pilot</a>
-      <a class="btn btn-ghost" href="/">See the live demo</a>
+      <a class="btn btn-ghost" href="/" data-demo>See the live demo</a>
     </div>
   </div>
 </section>
@@ -306,7 +306,7 @@
 <footer class="dark">
   <div class="wrap">
     <span class="muted">FIXCHAIN · hackathon prototype · the demo uses a simulated gateway, no real money moves</span>
-    <span><a href="https://github.com/Gaganajain/FIXCHAIN">GitHub</a> · <a href="/">Live demo</a></span>
+    <span><a href="https://github.com/Gaganajain/FIXCHAIN">GitHub</a> · <a href="/" data-demo>Live demo</a></span>
   </div>
 </footer>
 
@@ -322,6 +322,37 @@
       entries.forEach(function (e) { if (e.isIntersecting) { e.target.classList.add('in'); io.unobserve(e.target); } });
     }, { rootMargin: '0px 0px -8% 0px' });
     els.forEach(function (el) { io.observe(el); });
+  })();
+</script>
+<script>
+  // The demo backend runs on a free host that sleeps when idle (about 50 s to wake).
+  // Wake it as soon as this page opens, and if a visitor clicks a demo link before it is
+  // ready, show that it is waking instead of opening an empty dashboard. Without JS the
+  // links still work normally.
+  (function () {
+    var ready = false;
+    function ping() {
+      return fetch('/api/status', { cache: 'no-store' })
+        .then(function (r) { ready = r.ok; return r.ok; })
+        .catch(function () { return false; });
+    }
+    ping();
+    document.querySelectorAll('a[data-demo]').forEach(function (a) {
+      a.addEventListener('click', function (e) {
+        if (ready || e.metaKey || e.ctrlKey || e.shiftKey) return;
+        e.preventDefault();
+        if (a.getAttribute('aria-busy') === 'true') return;
+        a.setAttribute('aria-busy', 'true');
+        a.textContent = 'Waking up the demo…';
+        var started = Date.now();
+        (function wait() {
+          ping().then(function (ok) {
+            if (ok || Date.now() - started > 90000) { location.href = a.getAttribute('href'); }
+            else { setTimeout(wait, 2500); }
+          });
+        })();
+      });
+    });
   })();
 </script>
 <noscript><style>.reveal { opacity: 1; transform: none; }</style></noscript>

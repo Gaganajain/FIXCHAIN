@@ -1,0 +1,22 @@
+# Keeps the free-tier Render backend awake so the live demo answers instantly.
+# Render's free plan sleeps a service after ~15 idle minutes; a ping every 10 minutes prevents it.
+# GitHub may delay scheduled runs by a few minutes. Disable this workflow after the event if not needed.
+name: Keep demo backend warm
+
+on:
+  schedule:
+    - cron: "*/10 * * * *"
+  workflow_dispatch:
+
+permissions: {}
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    steps:
+      - name: Ping the API
+        run: |
+          curl -fsS --retry 3 --retry-delay 10 --max-time 90 \
+            https://fixchain-api.onrender.com/api/status -o /dev/null \
+            && echo "backend awake" || echo "ping failed (will retry next run)"

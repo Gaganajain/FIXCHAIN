@@ -98,6 +98,15 @@ export default function App() {
           </div>
         </header>
         <main className="min-w-0 flex-1 p-4 md:p-6">
+          {!status && error && !["localhost", "127.0.0.1"].includes(location.hostname) && (
+            <div role="status" className="mb-4 flex items-center gap-3 rounded-xl border border-warn/50 bg-warn/10 px-4 py-3 text-[14px] text-ink-2">
+              <span aria-hidden className="h-4 w-4 shrink-0 animate-spin rounded-full border-2 border-warn border-t-transparent" />
+              <span>
+                <span className="font-semibold text-ink">Waking up the demo backend…</span>{" "}
+                Free hosting sleeps when idle, so the first visit can take up to a minute. This page fills in on its own.
+              </span>
+            </div>
+          )}
           {view === "overview" && <Overview openIncident={openIncident} />}
           {view === "incidents" && <Incidents selected={incident} select={setIncident} />}
           {view === "simulator" && <Simulator status={status} refreshStatus={reload} />}
