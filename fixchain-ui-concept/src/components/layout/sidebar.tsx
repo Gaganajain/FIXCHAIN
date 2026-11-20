@@ -1,31 +1,33 @@
-"use client";
-
-import { useState } from "react";
 import {
-  LayoutDashboard,
-  FileText,
-  ShieldAlert,
-  CircuitBoard,
-  ClipboardList,
   BookOpen,
-  BarChart3,
-  Settings,
+  Bot,
+  ChevronsLeft,
+  ChevronsRight,
+  FlaskConical,
+  Inbox,
+  LayoutDashboard,
+  LineChart,
   LogOut,
-  Menu,
-  ChevronLeft,
+  ShieldAlert,
+  ShieldCheck,
+  Wrench,
+  Zap,
 } from "lucide-react";
+import { toast } from "sonner";
 import { cn } from "@/lib/utils";
+import { usePendingCount } from "@/data/decisions";
+import type { Navigate } from "@/App";
 
 const navigation = [
-  { name: "Mission Control", href: "/", icon: LayoutDashboard },
-  { name: "Ticket Center", href: "/tickets", icon: FileText },
-  { name: "Incident Intelligence", href: "/incidents", icon: ShieldAlert },
-  { name: "AI Agent Command", href: "/agents", icon: CircuitBoard },
-  { name: "Resolution & Approval", href: "/approvals", icon: ClipboardList },
-  { name: "Engineering Remediation", href: "/engineering", icon: BookOpen },
-  { name: "Knowledge & Learning", href: "/knowledge", icon: BarChart3 },
-  { name: "Simulation Lab", href: "/simulation", icon: Settings },
-  { name: "Historical Analytics", href: "/analytics", icon: BarChart3 },
+  { name: "Mission control", href: "/", icon: LayoutDashboard },
+  { name: "Tickets", href: "/tickets", icon: Inbox },
+  { name: "Incidents", href: "/incidents", icon: ShieldAlert },
+  { name: "Agents", href: "/agents", icon: Bot },
+  { name: "Approvals", href: "/approvals", icon: ShieldCheck, badge: true },
+  { name: "Code fixes", href: "/engineering", icon: Wrench },
+  { name: "Knowledge", href: "/knowledge", icon: BookOpen },
+  { name: "Simulation lab", href: "/simulation", icon: FlaskConical },
+  { name: "Analytics", href: "/analytics", icon: LineChart },
 ];
 
 interface SidebarProps {
@@ -33,83 +35,80 @@ interface SidebarProps {
   setCollapsed: (collapsed: boolean) => void;
   currentPath: string;
   width: number;
+  navigate: Navigate;
 }
 
-export function Sidebar({ collapsed, setCollapsed, currentPath, width }: SidebarProps) {
-  const [hoveredItem, setHoveredItem] = useState<string | null>(null);
-
+export function Sidebar({ collapsed, setCollapsed, currentPath, width, navigate }: SidebarProps) {
+  const pending = usePendingCount();
   return (
-    <aside
-      className={cn(
-        "fixed inset-y-0 left-0 z-20 flex flex-col transition-all duration-300",
-        `w-${width}`,
-      )}
-      style={{ width }}
-    >
-        <div className="flex items-center justify-between h-16 border-b border-border px-5 bg-background shrink-0">
-          <div className="flex flex-col items-center gap-1">
-            <img src="/paytm-logo.svg" alt="Paytm" width="120" height="auto" className="block" />
-            {!collapsed && (
-              <span className="text-[10px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">
-                FIXCHAIN
+    <aside className="fixed inset-y-0 left-0 z-20 flex flex-col border-r border-border bg-card transition-[width] duration-300" style={{ width }}>
+      <div className={cn("flex h-16 shrink-0 items-center border-b border-border", collapsed ? "justify-center px-2" : "justify-between px-5")}>
+        <a href="/" onClick={(e) => { e.preventDefault(); navigate("/"); }} className="flex items-center gap-2.5" aria-label="FIXCHAIN home">
+          <span className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-[#00BAF2] text-white">
+            <Zap className="h-5 w-5" strokeWidth={2.5} />
+          </span>
+          {!collapsed && (
+            <span className="leading-none">
+              <span className="block text-[20px] font-extrabold tracking-tight">
+                <span className="text-primary">FIX</span><span className="text-[#00BAF2]">CHAIN</span>
               </span>
-            )}
-          </div>
-          <button
-          onClick={() => setCollapsed(!collapsed)}
-          className="p-2 rounded-md hover:bg-accent text-muted-foreground"
-          aria-label="Toggle sidebar"
-        >
-          {collapsed ? <ChevronLeft className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
-        </button>
+              <span className="mt-1 block text-[11px] text-muted-foreground">for Paytm merchants</span>
+            </span>
+          )}
+        </a>
+        {!collapsed && (
+          <button onClick={() => setCollapsed(true)} className="rounded-md p-1.5 text-muted-foreground hover:bg-accent hover:text-primary" aria-label="Collapse menu" title="Collapse menu">
+            <ChevronsLeft className="h-5 w-5" />
+          </button>
+        )}
       </div>
 
-      <nav className="flex-1 overflow-y-auto px-3 py-4 space-y-0.5">
+      <nav className="flex-1 space-y-1 overflow-y-auto px-3 py-4" aria-label="Main">
         {navigation.map((item) => {
           const isActive = currentPath === item.href;
           const Icon = item.icon;
           return (
-            <div
-              key={item.name}
-              className="relative"
-              onMouseEnter={() => setHoveredItem(item.href)}
-              onMouseLeave={() => setHoveredItem(null)}
+            <a
+              key={item.href}
+              href={item.href}
+              title={collapsed ? item.name : undefined}
+              aria-current={isActive ? "page" : undefined}
+              onClick={(e) => { e.preventDefault(); navigate(item.href); }}
+              className={cn(
+                "relative flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-colors",
+                collapsed && "justify-center px-0",
+                isActive ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:bg-accent hover:text-primary",
+              )}
             >
-              <a
-                href={item.href}
-                className={cn(
-                  "flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-all duration-200",
-                  isActive
-                    ? "bg-primary/10 text-primary border border-primary/20 shadow-sm"
-                    : hoveredItem === item.href && !collapsed
-                    ? "bg-accent text-accent-foreground"
-                    : "text-muted-foreground hover:bg-accent/50 hover:text-accent-foreground",
-                )}
-              >
-                <Icon className={cn("h-5 w-5", isActive && "text-primary")} />
-                {!collapsed && <span>{item.name}</span>}
-                {isActive && !collapsed && (
-                  <div className="w-0.5 h-5 bg-primary absolute right-0 top-1 bottom-1" />
-                )}
-              </a>
-            </div>
+              <Icon className={cn("h-5 w-5 shrink-0", isActive && "text-[#00BAF2]")} />
+              {!collapsed && <span className="flex-1 truncate">{item.name}</span>}
+              {item.badge && pending > 0 ? (
+                <span className={cn(
+                  "rounded-full px-1.5 text-[11px] font-bold leading-5",
+                  collapsed && "absolute right-1.5 top-1 leading-4",
+                  isActive ? "bg-white text-primary" : "bg-amber-500 text-white",
+                )}>{pending}</span>
+              ) : null}
+            </a>
           );
         })}
       </nav>
 
-      <div className="border-t border-border bg-background/80 backdrop-blur shrink-0 p-4">
-        <div className="flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-all duration-200">
-          <LogOut className="h-5 w-5" />
-          <span className="text-muted-foreground hover:text-destructive transition-colors">Sign out</span>
-        </div>
-        <div className="mt-3 flex items-center gap-2">
-          <button
-            className="p-2 rounded-md hover:bg-accent text-muted-foreground"
-            aria-label="Toggle theme"
-          >
-            <Settings className="h-5 w-5" />
+      <div className="shrink-0 border-t border-border p-3">
+        {collapsed && (
+          <button onClick={() => setCollapsed(false)} className="mb-1 flex w-full justify-center rounded-xl p-2.5 text-muted-foreground hover:bg-accent hover:text-primary" aria-label="Expand menu" title="Expand menu">
+            <ChevronsRight className="h-5 w-5" />
           </button>
-        </div>
+        )}
+        <button
+          onClick={() => toast.info("This concept has no sign-in. Run the FIXCHAIN dashboard for demo roles.")}
+          className={cn("flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium text-muted-foreground hover:bg-destructive/5 hover:text-destructive", collapsed && "justify-center px-0")}
+          title={collapsed ? "Sign out" : undefined}
+        >
+          <LogOut className="h-5 w-5 shrink-0" />
+          {!collapsed && <span>Sign out</span>}
+        </button>
+        {!collapsed && <p className="mt-2 px-3 text-[11px] leading-snug text-muted-foreground">Sample data. Independent hackathon project, not an official Paytm product.</p>}
       </div>
     </aside>
   );

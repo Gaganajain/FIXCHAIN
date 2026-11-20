@@ -1,178 +1,111 @@
-"use client";
+import { useState } from "react";
+import { Bar, BarChart, CartesianGrid, Cell, Legend, Pie, PieChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Stat } from "@/components/ui/stat";
+import { cn } from "@/lib/utils";
 
-import { motion } from "framer-motion";
-import {
-  Activity,
-  Clock,
-  Percent,
-  PieChart,
-  RefreshCw,
-  CheckCircle2,
-} from "lucide-react";
-import { Badge } from "@/components/ui/badge";
-import {
-  Card,
-  CardContent,
-  CardFooter,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
-import {
-  BarChart,
-  Bar,
-  XAxis,
-  YAxis,
-  CartesianGrid,
-  Tooltip,
-  ResponsiveContainer,
-} from "recharts";
-import { Button } from "@/lib/shadcn";
+const RANGES = { "7d": "Last 7 days", "30d": "Last 30 days" } as const;
+type Range = keyof typeof RANGES;
 
-const monthlyData = [
-  { month: "Jan", tickets: 1200, resolved: 1100, incidents: 15 },
-  { month: "Feb", tickets: 1400, resolved: 1300, incidents: 18 },
-  { month: "Mar", tickets: 1600, resolved: 1450, incidents: 22 },
-  { month: "Apr", tickets: 1800, resolved: 1700, incidents: 25 },
-  { month: "May", tickets: 2100, resolved: 1950, incidents: 28 },
-  { month: "Jun", tickets: 2400, resolved: 2200, incidents: 31 },
-  { month: "Jul", tickets: 2800, resolved: 2600, incidents: 35 },
-  { month: "Aug", tickets: 3200, resolved: 2900, incidents: 40 },
-  { month: "Sep", tickets: 2900, resolved: 2700, incidents: 36 },
-  { month: "Oct", tickets: 3100, resolved: 2950, incidents: 38 },
-  { month: "Nov", tickets: 2847, resolved: 2680, incidents: 23 },
-];
-
+const daily: Record<Range, { day: string; tickets: number; resolved: number }[]> = {
+  "7d": [
+    { day: "14 Nov", tickets: 210, resolved: 198 }, { day: "15 Nov", tickets: 186, resolved: 180 }, { day: "16 Nov", tickets: 240, resolved: 222 },
+    { day: "17 Nov", tickets: 198, resolved: 190 }, { day: "18 Nov", tickets: 265, resolved: 241 }, { day: "19 Nov", tickets: 230, resolved: 219 }, { day: "20 Nov", tickets: 300, resolved: 164 },
+  ],
+  "30d": [
+    { day: "Week 44", tickets: 1310, resolved: 1240 }, { day: "Week 45", tickets: 1405, resolved: 1338 }, { day: "Week 46", tickets: 1492, resolved: 1420 }, { day: "Week 47", tickets: 1629, resolved: 1414 },
+  ],
+};
 const categoryData = [
-  { name: "UPI Payments", value: 35, fill: "#3b82f6" },
-  { name: "Soundbox", value: 25, fill: "#10b981" },
-  { name: "Merchant QR", value: 20, fill: "#f59e0b" },
-  { name: "Settlement", value: 12, fill: "#ef4444" },
-  { name: "Platform Outage", value: 8, fill: "#8b5cf6" },
+  { name: "UPI payments", value: 41, fill: "#002970" },
+  { name: "Soundbox", value: 24, fill: "#00BAF2" },
+  { name: "Merchant QR", value: 14, fill: "#5B8DEF" },
+  { name: "Settlement", value: 12, fill: "#94C9E8" },
+  { name: "Platform outage", value: 9, fill: "#C7D2FE" },
+];
+const languageData = [
+  { name: "Hindi", tickets: 46 }, { name: "English", tickets: 33 }, { name: "Marathi", tickets: 21 },
 ];
 
 export function HistoricalAnalytics() {
+  const [range, setRange] = useState<Range>("7d");
+  const data = daily[range];
+  const total = data.reduce((a, d) => a + d.tickets, 0);
+  const resolved = data.reduce((a, d) => a + d.resolved, 0);
+
   return (
     <div className="space-y-6">
-      <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+      <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight">Historical Analytics</h1>
-          <p className="text-muted-foreground">Analyze trends, SLA performance, and incident patterns</p>
+          <h1 className="text-2xl font-bold tracking-tight text-primary">Analytics</h1>
+          <p className="text-muted-foreground">Every figure comes from saved records, never a model's estimate. Sample data here.</p>
         </div>
-        <Button variant="outline" onClick={() => {}}>
-          <RefreshCw className="mr-2 h-4 w-4" /> Refresh Data
-        </Button>
+        <div role="tablist" className="inline-flex rounded-lg border border-border bg-muted p-0.5">
+          {(Object.keys(RANGES) as Range[]).map((r) => (
+            <button key={r} role="tab" aria-selected={range === r} onClick={() => setRange(r)}
+              className={cn("rounded-md px-3 py-1.5 text-sm font-medium", range === r ? "bg-card text-primary shadow-sm" : "text-muted-foreground hover:text-primary")}>{RANGES[r]}</button>
+          ))}
+        </div>
       </div>
 
-      {/* Key Metrics */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        {[
-          { label: "Total Tickets (30d)", value: "28,847", change: "+12%", trend: "up" as const, icon: Activity, color: "text-primary" },
-          { label: "Resolution Rate", value: "94.2%", change: "+1.2%", trend: "up" as const, icon: CheckCircle2, color: "text-emerald-600" },
-          { label: "Avg Resolution Time", value: "14m", change: "-2m", trend: "down" as const, icon: Clock, color: "text-indigo-600" },
-          { label: "SLA Compliance", value: "98.1%", change: "+0.5%", trend: "up" as const, icon: Percent, color: "text-emerald-600" },
-        ].map((stat) => {
-          const Icon = stat.icon;
-          return (
-            <motion.div key={stat.label} whileHover={{ y: -2 }} className="rounded-xl border p-5 bg-card shadow-sm">
-              <div className="flex items-center justify-between mb-3">
-                <div className="p-2 rounded-lg bg-primary/10 text-primary">
-                  <Icon className="h-5 w-5" />
-                </div>
-                <Badge variant="outline" className="text-xs">
-                  {stat.trend === "up" ? "▲" : "▼"} {stat.change}
-                </Badge>
-              </div>
-              <div className="text-2xl font-bold">{stat.value}</div>
-              <div className="text-sm font-medium text-muted-foreground">{stat.label}</div>
-            </motion.div>
-          );
-        })}
+      <div className="grid grid-cols-2 gap-4 md:grid-cols-4">
+        <Stat label="Tickets" value={total.toLocaleString("en-IN")} sub={RANGES[range].toLowerCase()} />
+        <Stat label="Resolved with proof" value={`${Math.round((100 * resolved) / total)}%`} tone="good" sub={`${resolved.toLocaleString("en-IN")} tickets`} />
+        <Stat label="Duplicate reports grouped" value="88%" tone="sky" sub="Linked to a parent incident" />
+        <Stat label="Unapproved payment actions" value="0" tone="good" sub="Blocked by the policy engine" />
       </div>
 
-      {/* Charts */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
         <Card>
-          <CardHeader>
-            <CardTitle className="text-sm font-medium">Ticket Volume & Resolution (12 Months)</CardTitle>
-          </CardHeader>
+          <CardHeader><CardTitle className="text-base font-semibold text-primary">Tickets in and resolved</CardTitle><CardDescription>{RANGES[range]}</CardDescription></CardHeader>
           <CardContent>
             <ResponsiveContainer width="100%" height={300}>
-              <BarChart data={monthlyData}>
-                <CartesianGrid strokeDasharray="3 3" vertical={false} />
-                <XAxis dataKey="month" />
-                <YAxis />
+              <BarChart data={data} margin={{ left: -10 }}>
+                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#E2E8F0" />
+                <XAxis dataKey="day" tick={{ fontSize: 12 }} />
+                <YAxis tick={{ fontSize: 12 }} />
                 <Tooltip />
-                <Bar dataKey="tickets" fill="#3b82f6" radius={[4, 4, 0, 0]} />
-                <Bar dataKey="resolved" fill="#10b981" radius={[4, 4, 0, 0]} />
+                <Legend wrapperStyle={{ fontSize: 12 }} />
+                <Bar dataKey="tickets" name="Tickets in" fill="#002970" radius={[4, 4, 0, 0]} />
+                <Bar dataKey="resolved" name="Resolved with proof" fill="#10B981" radius={[4, 4, 0, 0]} />
               </BarChart>
             </ResponsiveContainer>
           </CardContent>
-          <CardFooter>
-            <div className="flex gap-4 text-xs">
-              <div className="flex items-center gap-1">
-                <span className="h-2 w-2 rounded-full bg-blue-500" />
-                <span>Tickets Received</span>
-              </div>
-              <div className="flex items-center gap-1">
-                <span className="h-2 w-2 rounded-full bg-emerald-500" />
-                <span>Resolved</span>
-              </div>
-            </div>
-          </CardFooter>
         </Card>
 
         <Card>
-          <CardHeader>
-            <CardTitle className="text-sm font-medium">Incidents by Category</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="h-300 flex items-center">
-              <PieChart className="h-24 w-24 text-muted-foreground" />
-              <div className="ml-6 space-y-4">
-                {categoryData.map((cat) => (
-                  <div key={cat.name} className="flex items-center gap-3">
-                    <span className="w-3 h-3 rounded-full" style={{ backgroundColor: cat.fill }} />
-                    <div>
-                      <div className="text-sm font-medium">{cat.name}</div>
-                      <div className="text-xs text-muted-foreground">{cat.value}%</div>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
+          <CardHeader><CardTitle className="text-base font-semibold text-primary">Tickets by category</CardTitle><CardDescription>Share of all tickets, {RANGES[range].toLowerCase()}</CardDescription></CardHeader>
+          <CardContent className="flex flex-col items-center gap-4 sm:flex-row">
+            <ResponsiveContainer width="100%" height={260} className="sm:!w-1/2">
+              <PieChart>
+                <Pie data={categoryData} dataKey="value" nameKey="name" innerRadius={60} outerRadius={100} paddingAngle={2}>
+                  {categoryData.map((c) => <Cell key={c.name} fill={c.fill} />)}
+                </Pie>
+                <Tooltip formatter={(v) => `${v}%`} />
+              </PieChart>
+            </ResponsiveContainer>
+            <ul className="w-full space-y-3 sm:w-1/2">
+              {categoryData.map((cat) => (
+                <li key={cat.name} className="flex items-center justify-between text-sm">
+                  <span className="flex items-center gap-2"><span className="h-3 w-3 rounded-full" style={{ backgroundColor: cat.fill }} />{cat.name}</span>
+                  <span className="font-semibold tabular-nums">{cat.value}%</span>
+                </li>
+              ))}
+            </ul>
           </CardContent>
         </Card>
       </div>
 
-      {/* Regional Distribution */}
       <Card>
-        <CardHeader>
-          <CardTitle className="text-sm font-medium">Regional Incident Distribution</CardTitle>
-        </CardHeader>
+        <CardHeader><CardTitle className="text-base font-semibold text-primary">Tickets by language</CardTitle><CardDescription>Customers write in the language they're comfortable with; replies go back in the same language.</CardDescription></CardHeader>
         <CardContent>
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-            {[
-              { region: "North", incidents: 45, customers: "12.4K" },
-              { region: "South", incidents: 38, customers: "9.8K" },
-              { region: "East", incidents: 52, customers: "15.2K" },
-              { region: "West", incidents: 61, customers: "18.4K" },
-              { region: "Central", incidents: 29, customers: "7.1K" },
-              { region: "Northeast", incidents: 18, customers: "4.5K" },
-            ].map((r) => (
-              <Card key={r.region} className="p-3">
-                <CardContent>
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <div className="text-sm font-medium">{r.region}</div>
-                      <div className="text-xs text-muted-foreground">{r.incidents} incidents</div>
-                    </div>
-                    <div className="text-right">
-                      <div className="text-sm font-bold">{r.customers}</div>
-                      <div className="text-xs text-muted-foreground">customers</div>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
+          <div className="space-y-3">
+            {languageData.map((l) => (
+              <div key={l.name} className="flex items-center gap-3 text-sm">
+                <span className="w-20 shrink-0 text-muted-foreground">{l.name}</span>
+                <div className="h-3 flex-1 overflow-hidden rounded-full bg-muted"><div className="h-full rounded-full bg-[#00BAF2]" style={{ width: `${l.tickets}%` }} /></div>
+                <span className="w-10 text-right font-semibold tabular-nums">{l.tickets}%</span>
+              </div>
             ))}
           </div>
         </CardContent>
@@ -180,4 +113,3 @@ export function HistoricalAnalytics() {
     </div>
   );
 }
-

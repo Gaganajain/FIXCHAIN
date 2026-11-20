@@ -1,386 +1,173 @@
-"use client";
-
-import { useState } from "react";
-import { motion, AnimatePresence } from "framer-motion";
-import {
-  Search,
-  Filter,
-  Clock,
-  User,
-  Phone,
-  CreditCard,
-  ExternalLink,
-  ChevronRight,
-  MessageCircle,
-  AlertCircle,
-} from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
+import { AnimatePresence, motion } from "framer-motion";
+import { AlertCircle, ChevronRight, Download, Plus, Search, Send, X } from "lucide-react";
+import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardFooter,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Input } from "@/components/ui/input";
+import { Stat } from "@/components/ui/stat";
 import { Button } from "@/lib/shadcn";
-import { cn } from "@/lib/utils";
-import {
-  TicketPriority,
-  TicketStatus,
-  TicketCategory,
-  Ticket,
-} from "@/types";
+import { cn, getPriorityColor, getStatusColor } from "@/lib/utils";
+import { TicketCategory, TicketPriority, TicketStatus } from "@/types";
+import { LANG_LABEL, TICKETS, type FxTicket } from "@/data/fixchain";
+import type { Navigate } from "@/App";
 
 const CATEGORY_LABELS: Record<TicketCategory, string> = {
-  upi_payment: "UPI Payment",
-  soundbox: "Soundbox",
-  merchant_qr: "Merchant QR",
-  settlement: "Settlement",
-  platform_outage: "Platform Outage",
-  other: "Other",
+  upi_payment: "UPI payment", soundbox: "Soundbox", merchant_qr: "Merchant QR", settlement: "Settlement", platform_outage: "Platform outage", other: "Fraud or other",
+};
+const PRIORITY_LABELS: Record<TicketPriority, string> = { low: "Low", medium: "Medium", high: "High", critical: "Critical" };
+const STATUS_LABELS: Record<TicketStatus, string> = { open: "Open", in_progress: "In progress", resolved: "Resolved", closed: "Closed", escalated: "With a person" };
+
+/** Reply templates in the customer's language (FIXCHAIN only sends approved templates). */
+const REPLY: Record<string, string> = {
+  en: "We found the problem and are fixing it. We'll update you as soon as your order is confirmed.",
+  hi: "Humne samasya pehchaan li hai aur use theek kar rahe hain. Order confirm hote hi aapko bataenge.",
+  mr: "आम्हाला समस्या सापडली आहे आणि ती दुरुस्त करत आहोत. ऑर्डर निश्चित होताच कळवू.",
 };
 
-const PRIORITY_LABELS: Record<TicketPriority, string> = {
-  low: "Low",
-  medium: "Medium",
-  high: "High",
-  critical: "Critical",
-};
+/** Severity by rule (mirrors ops/taxonomy.py): category base + amount, never a model guess. */
+function priorityFor(cat: TicketCategory, amount: number): TicketPriority {
+  const base = { upi_payment: 2, merchant_qr: 2, settlement: 2, soundbox: 1, platform_outage: 3, other: 3 }[cat];
+  const score = base + (amount >= 1000 ? 1 : 0);
+  return score >= 4 ? "critical" : score === 3 ? "high" : score === 2 ? "medium" : "low";
+}
 
-const STATUS_LABELS: Record<TicketStatus, string> = {
-  open: "Open",
-  in_progress: "In Progress",
-  resolved: "Resolved",
-  closed: "Closed",
-  escalated: "Escalated",
-};
+const relTime = (iso: string) => new Date(iso).toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit" });
 
-const mockTickets: Ticket[] = [
-  {
-    id: "TK-2024-001",
-    customerId: "CUST-8842",
-    customerName: "Rahul Sharma",
-    customerEmail: "rahul.sharma@email.com",
-    customerPhone: "+91 98765 43210",
-    category: "upi_payment",
-    priority: "critical",
-    status: "open",
-    subject: "UPI payment failed but amount deducted",
-    description: "Customer attempted a ₹2,500 UPI payment to Merchant XYZ. Payment failed at gateway but amount was deducted from bank account.",
-    amount: 2500,
-    transactionId: "TXN-778899",
-    createdAt: "2024-11-19T10:15:00Z",
-    updatedAt: "2024-11-19T10:15:00Z",
-    assignedTo: "Agent-01",
-    incidentId: "INC-001",
-    channel: "app",
-  },
-  {
-    id: "TK-2024-002",
-    customerId: "CUST-8843",
-    customerName: "Priya Patel",
-    customerEmail: "priya.patel@email.com",
-    customerPhone: "+91 98765 43211",
-    category: "soundbox",
-    priority: "high",
-    status: "in_progress",
-    subject: "Soundbox not announcing payments",
-    description: "Merchant soundbox device stopped announcing successful payments after firmware update.",
-    amount: 0,
-    transactionId: undefined,
-    createdAt: "2024-11-19T09:45:00Z",
-    updatedAt: "2024-11-19T11:30:00Z",
-    assignedTo: "Agent-03",
-    incidentId: "INC-002",
-    channel: "call",
-  },
-  {
-    id: "TK-2024-003",
-    customerId: "CUST-8844",
-    customerName: "Amit Singh",
-    customerEmail: "amit.singh@email.com",
-    customerPhone: "+91 98765 43212",
-    category: "merchant_qr",
-    priority: "medium",
-    status: "resolved",
-    subject: "QR code not scanning at checkout",
-    description: "Customer unable to scan merchant QR code at retail store.",
-    amount: 450,
-    transactionId: "TXN-778901",
-    createdAt: "2024-11-19T08:20:00Z",
-    updatedAt: "2024-11-19T09:10:00Z",
-    resolvedAt: "2024-11-19T09:10:00Z",
-    assignedTo: "Agent-02",
-    incidentId: undefined,
-    satisfactionScore: 5,
-    channel: "web",
-  },
-  {
-    id: "TK-2024-004",
-    customerId: "CUST-8845",
-    customerName: "Sneha Reddy",
-    customerEmail: "sneha.reddy@email.com",
-    customerPhone: "+91 98765 43213",
-    category: "settlement",
-    priority: "high",
-    status: "open",
-    subject: "Settlement not received for 3 days",
-    description: "Merchant settlement for last 3 days not credited to bank account.",
-    amount: 45000,
-    transactionId: undefined,
-    createdAt: "2024-11-19T07:10:00Z",
-    updatedAt: "2024-11-19T07:10:00Z",
-    assignedTo: "Agent-04",
-    incidentId: "INC-003",
-    channel: "email",
-  },
-  {
-    id: "TK-2024-005",
-    customerId: "CUST-8846",
-    customerName: "Vikram Joshi",
-    customerEmail: "vikram.joshi@email.com",
-    customerPhone: "+91 98765 43214",
-    category: "platform_outage",
-    priority: "critical",
-    status: "escalated",
-    subject: "Complete platform outage - cannot process any payments",
-    description: "Multiple merchants reporting complete inability to process payments across all channels.",
-    amount: 0,
-    transactionId: undefined,
-    createdAt: "2024-11-19T06:00:00Z",
-    updatedAt: "2024-11-19T08:45:00Z",
-    assignedTo: "Agent-01",
-    incidentId: "INC-004",
-    channel: "call",
-  },
-  {
-    id: "TK-2024-006",
-    customerId: "CUST-8847",
-    customerName: "Anita Desai",
-    customerEmail: "anita.desai@email.com",
-    customerPhone: "+91 98765 43215",
-    category: "upi_payment",
-    priority: "medium",
-    status: "closed",
-    subject: "Duplicate UPI charge",
-    description: "Customer charged twice for a single UPI transaction.",
-    amount: 1200,
-    transactionId: "TXN-778905",
-    createdAt: "2024-11-18T16:30:00Z",
-    updatedAt: "2024-11-18T17:45:00Z",
-    resolvedAt: "2024-11-18T17:45:00Z",
-    assignedTo: "Agent-02",
-    incidentId: undefined,
-    satisfactionScore: 4,
-    channel: "app",
-  },
-];
-
-export function TicketCenter({ navigate }: any) {
-  const [searchQuery, setSearchQuery] = useState("");
+export function TicketCenter({ navigate }: { navigate: Navigate }) {
+  const [tickets, setTickets] = useState<FxTicket[]>(TICKETS);
+  const [searchQuery, setSearchQuery] = useState(() => new URLSearchParams(window.location.search).get("q") ?? "");
   const [priorityFilter, setPriorityFilter] = useState<TicketPriority | "all">("all");
   const [categoryFilter, setCategoryFilter] = useState<TicketCategory | "all">("all");
   const [statusFilter, setStatusFilter] = useState<TicketStatus | "all">("all");
-  const [selectedTicket, setSelectedTicket] = useState<Ticket | null>(null);
+  const [selected, setSelected] = useState<FxTicket | null>(null);
+  const [replies, setReplies] = useState<Record<string, string[]>>({});
+  const [creating, setCreating] = useState(false);
 
-  const filteredTickets = mockTickets.filter((t) => {
-    const matchesSearch =
-      t.subject.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      t.customerName.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      t.id.toLowerCase().includes(searchQuery.toLowerCase());
-    const matchesPriority = priorityFilter === "all" || t.priority === priorityFilter;
-    const matchesCategory = categoryFilter === "all" || t.category === categoryFilter;
-    const matchesStatus = statusFilter === "all" || t.status === statusFilter;
-    return matchesSearch && matchesPriority && matchesCategory && matchesStatus;
-  });
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") { setSelected(null); setCreating(false); } };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, []);
 
-  const priorityOptions: TicketPriority[] = ["low", "medium", "high", "critical"];
-  const categoryOptions: TicketCategory[] = ["upi_payment", "soundbox", "merchant_qr", "settlement", "platform_outage", "other"];
-  const statusOptions: TicketStatus[] = ["open", "in_progress", "resolved", "closed", "escalated"];
+  const filtered = useMemo(() => tickets.filter((t) => {
+    const q = searchQuery.toLowerCase();
+    const matchesSearch = !q || [t.subject, t.customerName, t.id, t.message, t.incidentId ?? ""].some((v) => v.toLowerCase().includes(q));
+    return matchesSearch && (priorityFilter === "all" || t.priority === priorityFilter)
+      && (categoryFilter === "all" || t.category === categoryFilter) && (statusFilter === "all" || t.status === statusFilter);
+  }), [tickets, searchQuery, priorityFilter, categoryFilter, statusFilter]);
+
+  const anyFilter = searchQuery || priorityFilter !== "all" || categoryFilter !== "all" || statusFilter !== "all";
+  const clearFilters = () => { setSearchQuery(""); setPriorityFilter("all"); setCategoryFilter("all"); setStatusFilter("all"); };
+
+  const exportCsv = () => {
+    const rows = [["id", "customer", "language", "category", "priority", "status", "amount", "incident", "created"],
+      ...filtered.map((t) => [t.id, t.customerName, LANG_LABEL[t.language], CATEGORY_LABELS[t.category], t.priority, t.status, String(t.amount ?? ""), t.incidentId ?? "", t.createdAt])];
+    const csv = rows.map((r) => r.map((v) => `"${v.replace(/"/g, '""')}"`).join(",")).join("\n");
+    const a = Object.assign(document.createElement("a"), { href: URL.createObjectURL(new Blob([csv], { type: "text/csv" })), download: "fixchain-tickets-sample.csv" });
+    a.click();
+    URL.revokeObjectURL(a.href);
+    toast.success(`Exported ${filtered.length} tickets`);
+  };
+
+  const sendReply = (t: FxTicket) => {
+    setReplies((r) => ({ ...r, [t.id]: [...(r[t.id] ?? []), REPLY[t.language]] }));
+    toast.success(`Reply sent to ${t.customerName} in ${LANG_LABEL[t.language]}`);
+  };
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+      <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight">Ticket Center</h1>
-          <p className="text-muted-foreground">Manage customer tickets and track resolution progress</p>
+          <h1 className="text-2xl font-bold tracking-tight text-primary">Tickets</h1>
+          <p className="text-muted-foreground">Complaints from customers and merchants in English, Hindi and Marathi.</p>
         </div>
-        <Button onClick={() => setSelectedTicket(null)}>
-          <CreditCard className="mr-2 h-4 w-4" /> New Ticket
-        </Button>
+        <div className="flex gap-2">
+          <Button variant="outline" onClick={exportCsv}><Download className="mr-2 h-4 w-4" /> Export CSV</Button>
+          <Button onClick={() => setCreating(true)}><Plus className="mr-2 h-4 w-4" /> Raise a ticket</Button>
+        </div>
       </div>
 
-      {/* Filters */}
       <Card>
         <CardContent className="p-4">
-          <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4">
-            <div className="flex-1">
-              <Input
-                placeholder="Search tickets, customers..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                left={<Search className="h-4 w-4 text-muted-foreground" />}
-              />
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-5">
+            <div className="lg:col-span-2">
+              <Input placeholder="Search name, message, TK- or INC-" value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} left={<Search className="h-4 w-4" />} aria-label="Search tickets" />
             </div>
-            <div className="flex-1">
-              <Select value={priorityFilter === "all" ? "" : priorityFilter} onValueChange={(v) => setPriorityFilter(v as TicketPriority | "all")}>
-                <SelectTrigger className="w-full">
-                  <SelectValue placeholder="Priority" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All Priorities</SelectItem>
-                  {priorityOptions.map((p) => (
-                    <SelectItem key={p} value={p}>{PRIORITY_LABELS[p]}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="flex-1">
-              <Select value={categoryFilter === "all" ? "" : categoryFilter} onValueChange={(v) => setCategoryFilter(v as TicketCategory | "all")}>
-                <SelectTrigger className="w-full">
-                  <SelectValue placeholder="Category" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All Categories</SelectItem>
-                  {categoryOptions.map((c) => (
-                    <SelectItem key={c} value={c}>{CATEGORY_LABELS[c]}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="flex-1">
-              <Select value={statusFilter === "all" ? "" : statusFilter} onValueChange={(v) => setStatusFilter(v as TicketStatus | "all")}>
-                <SelectTrigger className="w-full">
-                  <SelectValue placeholder="Status" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All Statuses</SelectItem>
-                  {statusOptions.map((s) => (
-                    <SelectItem key={s} value={s}>{STATUS_LABELS[s]}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="flex-1">
-              <Button variant="outline" className="w-full">
-                <Filter className="mr-2 h-4 w-4" /> Filters
-              </Button>
-            </div>
-            <div className="flex-1">
-              <Button variant="outline" className="w-full">
-                <ExternalLink className="mr-2 h-4 w-4" /> Export
-              </Button>
-            </div>
+            <Select value={priorityFilter} onValueChange={(v) => setPriorityFilter(v as TicketPriority | "all")}>
+              <SelectTrigger aria-label="Priority"><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Any priority</SelectItem>
+                {(Object.keys(PRIORITY_LABELS) as TicketPriority[]).map((p) => <SelectItem key={p} value={p}>{PRIORITY_LABELS[p]}</SelectItem>)}
+              </SelectContent>
+            </Select>
+            <Select value={categoryFilter} onValueChange={(v) => setCategoryFilter(v as TicketCategory | "all")}>
+              <SelectTrigger aria-label="Category"><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Any category</SelectItem>
+                {(Object.keys(CATEGORY_LABELS) as TicketCategory[]).map((c) => <SelectItem key={c} value={c}>{CATEGORY_LABELS[c]}</SelectItem>)}
+              </SelectContent>
+            </Select>
+            <Select value={statusFilter} onValueChange={(v) => setStatusFilter(v as TicketStatus | "all")}>
+              <SelectTrigger aria-label="Status"><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Any status</SelectItem>
+                {(Object.keys(STATUS_LABELS) as TicketStatus[]).map((s) => <SelectItem key={s} value={s}>{STATUS_LABELS[s]}</SelectItem>)}
+              </SelectContent>
+            </Select>
           </div>
+          {anyFilter && <button onClick={clearFilters} className="mt-3 text-sm font-medium text-[#0098CC] hover:underline">Clear filters</button>}
         </CardContent>
       </Card>
 
-      {/* Stats Bar */}
-      <div className="grid grid-cols-4 gap-4">
-        {[
-          { label: "Total", value: mockTickets.length },
-          { label: "Open", value: mockTickets.filter((t) => t.status === "open").length },
-          { label: "In Progress", value: mockTickets.filter((t) => t.status === "in_progress").length },
-          { label: "Resolved", value: mockTickets.filter((t) => t.status === "resolved").length },
-        ].map((s) => (
-          <Card key={s.label} className="p-3 text-center">
-            <CardContent>
-              <div className="text-2xl font-bold">{s.value}</div>
-              <div className="text-xs text-muted-foreground">{s.label}</div>
-            </CardContent>
-          </Card>
-        ))}
+      <div className="grid grid-cols-2 gap-4 md:grid-cols-4">
+        <Stat label="All tickets" value={tickets.length} />
+        <Stat label="Open" value={tickets.filter((t) => t.status === "open").length} tone="warn" />
+        <Stat label="Grouped into an incident" value={tickets.filter((t) => t.incidentId).length} tone="sky" />
+        <Stat label="Resolved with proof" value={tickets.filter((t) => t.status === "resolved").length} tone="good" />
       </div>
 
-      {/* Tickets Table */}
       <Card>
-        <CardHeader>
-          <CardTitle className="text-sm font-medium">Tickets ({filteredTickets.length})</CardTitle>
-        </CardHeader>
-        <CardContent>
+        <CardHeader><CardTitle className="text-base font-semibold text-primary">Tickets ({filtered.length})</CardTitle></CardHeader>
+        <CardContent className="p-0">
           <div className="overflow-x-auto">
             <Table>
               <TableHeader>
-                <TableRow>
-                  <TableHeader className="w-20">Ticket ID</TableHeader>
-                  <TableHeader>Customer</TableHeader>
-                  <TableHeader className="w-40">Category</TableHeader>
-                  <TableHeader className="w-24">Priority</TableHeader>
-                  <TableHeader className="w-32">Status</TableHeader>
-                  <TableHeader className="w-24">Channel</TableHeader>
-                  <TableHeader className="w-20">Amount</TableHeader>
-                  <TableHeader className="w-24">Time</TableHeader>
-                  <TableHeader className="w-16" />
+                <TableRow className="hover:bg-transparent">
+                  <TableHead className="pl-4">Ticket</TableHead>
+                  <TableHead>Customer</TableHead>
+                  <TableHead>Category</TableHead>
+                  <TableHead>Priority</TableHead>
+                  <TableHead>Status</TableHead>
+                  <TableHead>Incident</TableHead>
+                  <TableHead className="text-right">Amount</TableHead>
+                  <TableHead>Time</TableHead>
+                  <TableHead className="w-8" />
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {filteredTickets.map((ticket) => (
-                  <TableRow
-                    key={ticket.id}
-                    onClick={() => setSelectedTicket(ticket)}
-                    className="cursor-pointer hover:bg-accent/50 transition-colors"
-                  >
-                    <TableCell className="font-medium text-sm">{ticket.id}</TableCell>
-                    <TableCell className="text-sm">
-                      <div className="flex items-center gap-2">
-                        <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center text-primary text-xs font-medium">
-                          {ticket.customerName.split(" ").map((n) => n[0]).join("")}
-                        </div>
-                        <div>
-                          <div className="text-sm font-medium">{ticket.customerName}</div>
-                          <div className="text-xs text-muted-foreground">{ticket.customerEmail}</div>
-                        </div>
-                      </div>
+                {filtered.map((t) => (
+                  <TableRow key={t.id} onClick={() => setSelected(t)} className="cursor-pointer" tabIndex={0} onKeyDown={(e) => e.key === "Enter" && setSelected(t)}>
+                    <TableCell className="pl-4 font-medium">{t.id}</TableCell>
+                    <TableCell>
+                      <div className="font-medium">{t.customerName}</div>
+                      <div className="max-w-[260px] truncate text-xs text-muted-foreground" lang={t.language}>{LANG_LABEL[t.language]}: “{t.message}”</div>
                     </TableCell>
-                    <TableCell className="text-sm">
-                      <Badge variant="outline" className="text-xs">{CATEGORY_LABELS[ticket.category]}</Badge>
-                    </TableCell>
-                    <TableCell className="text-sm">
-                      <Badge variant={ticket.priority === "critical" ? "destructive" : ticket.priority === "high" ? "outline" : "secondary"} className="text-xs capitalize">
-                        {PRIORITY_LABELS[ticket.priority]}
-                      </Badge>
-                    </TableCell>
-                    <TableCell className="text-sm">
-                      <Badge variant="outline" className="text-xs capitalize">{STATUS_LABELS[ticket.status]}</Badge>
-                    </TableCell>
-                    <TableCell className="text-sm text-muted-foreground">{ticket.channel}</TableCell>
-                    <TableCell className="text-sm">
-                      {ticket.amount ? `₹${ticket.amount.toLocaleString()}` : "—"}
-                    </TableCell>
-                    <TableCell className="text-sm text-muted-foreground">
-                      <span className="flex items-center gap-1">
-                        <Clock className="h-3 w-3" />
-                        {new Date(ticket.createdAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
-                      </span>
-                    </TableCell>
-                    <TableCell className="text-sm">
-                      <ChevronRight className="h-4 w-4 text-muted-foreground" />
-                    </TableCell>
+                    <TableCell><Badge variant="outline" className="text-xs">{CATEGORY_LABELS[t.category]}</Badge></TableCell>
+                    <TableCell><Badge variant="outline" className={cn("text-xs", getPriorityColor(t.priority))}>{PRIORITY_LABELS[t.priority]}</Badge></TableCell>
+                    <TableCell><Badge variant="outline" className={cn("text-xs", getStatusColor(t.status))}>{STATUS_LABELS[t.status]}</Badge></TableCell>
+                    <TableCell className="text-sm">{t.incidentId ?? <span className="text-muted-foreground">—</span>}</TableCell>
+                    <TableCell className="text-right tabular-nums">{t.amount ? `₹${t.amount.toLocaleString("en-IN")}` : "—"}</TableCell>
+                    <TableCell className="text-muted-foreground">{relTime(t.createdAt)}</TableCell>
+                    <TableCell><ChevronRight className="h-4 w-4 text-muted-foreground" /></TableCell>
                   </TableRow>
                 ))}
-                {filteredTickets.length === 0 && (
-                  <TableRow>
-                    <TableCell className="h-32 text-center text-muted-foreground">
-                      <div className="flex flex-col items-center justify-center h-full">
-                        <p className="text-sm">No tickets found matching your filters.</p>
-                      </div>
+                {filtered.length === 0 && (
+                  <TableRow className="hover:bg-transparent">
+                    <TableCell colSpan={9} className="h-32 text-center text-muted-foreground">
+                      No tickets match these filters. <button onClick={clearFilters} className="font-medium text-[#0098CC] hover:underline">Clear filters</button>
                     </TableCell>
                   </TableRow>
                 )}
@@ -390,77 +177,99 @@ export function TicketCenter({ navigate }: any) {
         </CardContent>
       </Card>
 
-      {/* Ticket Detail Drawer */}
+      {/* Ticket detail drawer */}
       <AnimatePresence>
-        {selectedTicket && (
-          <motion.div
-            initial={{ x: "100%" }}
-            animate={{ x: 0 }}
-            exit={{ x: "100%" }}
-            className="fixed inset-y-0 right-0 z-50 w-full md:w-[500px] bg-background border-l border-border shadow-2xl flex flex-col"
-          >
-            <div className="p-6 border-b border-border flex items-center justify-between">
-              <button
-                onClick={() => setSelectedTicket(null)}
-                className="p-2 rounded-md hover:bg-accent text-muted-foreground"
-              >
-                <ChevronRight className="h-5 w-5 rotate-180" />
-              </button>
-              <h2 className="text-lg font-bold">{selectedTicket.id}</h2>
-              <div className="flex gap-2">
-                <Button variant="ghost" size="sm" onClick={() => {}}>
-                  <MessageCircle className="h-4 w-4" /> Reply
-                </Button>
-                <Button variant="outline" size="sm" onClick={() => {}}>
-                  <ExternalLink className="h-4 w-4" /> View Timeline
-                </Button>
-              </div>
-            </div>
-            <CardContent className="p-6 overflow-y-auto">
-              <div className="space-y-6">
+        {selected && (
+          <>
+            <motion.div key="backdrop" className="fixed inset-0 z-40 bg-primary/20" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={() => setSelected(null)} />
+            <motion.aside key="drawer" role="dialog" aria-modal="true" aria-label={`Ticket ${selected.id}`}
+              initial={{ x: "100%" }} animate={{ x: 0 }} exit={{ x: "100%" }} transition={{ type: "tween", duration: 0.25 }}
+              className="fixed inset-y-0 right-0 z-50 flex w-full flex-col border-l border-border bg-background shadow-2xl md:w-[520px]">
+              <div className="flex items-center justify-between border-b border-border p-5">
                 <div>
-                  <h3 className="text-xl font-bold mb-2">{selectedTicket.subject}</h3>
-                  <p className="text-muted-foreground">{selectedTicket.description}</p>
+                  <div className="text-xs text-muted-foreground">{selected.id}, {CATEGORY_LABELS[selected.category]}</div>
+                  <h2 className="text-lg font-bold text-primary">{selected.subject}</h2>
                 </div>
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="p-3 rounded-lg border border-border bg-muted/50">
-                    <div className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-1">Customer</div>
-                    <div className="text-sm font-medium">{selectedTicket.customerName}</div>
-                    <div className="text-xs text-muted-foreground">{selectedTicket.customerEmail}</div>
-                    <div className="text-xs text-muted-foreground">{selectedTicket.customerPhone}</div>
-                  </div>
-                  <div className="p-3 rounded-lg border border-border bg-muted/50">
-                    <div className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-1">Transaction</div>
-                    <div className="text-sm font-medium">{selectedTicket.transactionId || "—"}</div>
-                    <div className="text-xs text-muted-foreground">{selectedTicket.amount ? `₹${selectedTicket.amount.toLocaleString()}` : "—"}</div>
-                    <div className="text-xs text-muted-foreground">{selectedTicket.channel}</div>
-                  </div>
-                </div>
-                <div className="p-3 rounded-lg border border-border bg-muted/50">
-                  <div className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-1">Assigned Agent</div>
-                  <div className="flex items-center gap-2">
-                    <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center text-primary text-xs font-medium">
-                      {selectedTicket.assignedTo?.split("-")[1] || "A"}
-                    </div>
-                    <div className="text-sm font-medium">{selectedTicket.assignedTo}</div>
-                  </div>
-                </div>
-                {selectedTicket.incidentId && (
-                  <div className="p-3 rounded-lg border border-amber-100 bg-amber-50">
-                    <div className="flex items-center gap-2 text-sm">
-                      <AlertCircle className="h-4 w-4 text-amber-600" />
-                      <div>
-                        <div className="font-medium text-amber-800">Related Incident</div>
-                        <div className="text-amber-600">{selectedTicket.incidentId}</div>
-                      </div>
-                    </div>
-                  </div>
-                )}
+                <button onClick={() => setSelected(null)} className="rounded-md p-2 text-muted-foreground hover:bg-accent" aria-label="Close"><X className="h-5 w-5" /></button>
               </div>
-            </CardContent>
-          </motion.div>
+              <div className="flex-1 space-y-5 overflow-y-auto p-5">
+                <div className="rounded-xl border border-border bg-card p-4">
+                  <div className="text-xs font-medium text-muted-foreground">What {selected.customerName} wrote, in {LANG_LABEL[selected.language]}</div>
+                  <p className="mt-1 text-[15px]" lang={selected.language}>“{selected.message}”</p>
+                  <p className="mt-2 text-sm text-muted-foreground">Understood as: {selected.description}</p>
+                </div>
+                <div className="grid grid-cols-2 gap-3 text-sm">
+                  <div className="rounded-lg border border-border bg-muted/50 p-3"><div className="text-xs text-muted-foreground">Transaction</div><div className="font-medium">{selected.transactionId ?? "—"}</div><div className="text-xs text-muted-foreground">{selected.amount ? `₹${selected.amount.toLocaleString("en-IN")}` : "No amount"}, via {selected.channel}</div></div>
+                  <div className="rounded-lg border border-border bg-muted/50 p-3"><div className="text-xs text-muted-foreground">With</div><div className="font-medium">{selected.assignedTo}</div><div className="text-xs text-muted-foreground">Phone {selected.customerPhone}</div></div>
+                </div>
+                {selected.incidentId && (
+                  <button onClick={() => navigate("/incidents")} className="flex w-full items-center gap-2 rounded-lg border border-amber-200 bg-amber-50 p-3 text-left text-sm hover:bg-amber-100">
+                    <AlertCircle className="h-4 w-4 text-amber-600" />
+                    <span><span className="font-medium text-amber-800">Part of {selected.incidentId}.</span> <span className="text-amber-700">Fixing the incident resolves this ticket.</span></span>
+                  </button>
+                )}
+                <div>
+                  <h3 className="mb-2 text-xs font-semibold text-muted-foreground">Timeline</h3>
+                  <ol className="space-y-2 border-l-2 border-border pl-4 text-sm">
+                    <li>Received at {relTime(selected.createdAt)} and understood</li>
+                    <li>Priority set to {PRIORITY_LABELS[selected.priority].toLowerCase()} by rule</li>
+                    {selected.incidentId && <li>Grouped into {selected.incidentId}</li>}
+                    {selected.status === "escalated" && <li>Handed to a human investigator (Tier 3)</li>}
+                    {selected.resolvedAt && <li>Resolved at {relTime(selected.resolvedAt)}, verified by the payment status API</li>}
+                    {(replies[selected.id] ?? []).map((r, i) => <li key={i} className="text-[#0098CC]" lang={selected.language}>Reply sent: “{r}”</li>)}
+                  </ol>
+                </div>
+              </div>
+              <div className="border-t border-border p-4">
+                <div className="mb-2 text-xs text-muted-foreground">Approved reply template in {LANG_LABEL[selected.language]}</div>
+                <p className="mb-3 rounded-lg bg-muted/60 p-3 text-sm" lang={selected.language}>{REPLY[selected.language]}</p>
+                <Button onClick={() => sendReply(selected)} className="w-full"><Send className="mr-2 h-4 w-4" /> Send reply</Button>
+              </div>
+            </motion.aside>
+          </>
         )}
       </AnimatePresence>
+
+      {creating && <RaiseTicket onClose={() => setCreating(false)} onCreate={(t) => { setTickets((ts) => [t, ...ts]); setCreating(false); toast.success(`${t.id} raised with ${t.priority} priority`); }} nextId={`TK-${1001 + tickets.length}`} />}
+    </div>
+  );
+}
+
+function RaiseTicket({ onClose, onCreate, nextId }: { onClose: () => void; onCreate: (t: FxTicket) => void; nextId: string }) {
+  const [name, setName] = useState("");
+  const [language, setLanguage] = useState<FxTicket["language"]>("hi");
+  const [category, setCategory] = useState<TicketCategory>("upi_payment");
+  const [amount, setAmount] = useState("");
+  const [message, setMessage] = useState("");
+  const amt = Number(amount) || 0;
+  const priority = priorityFor(category, amt);
+  const submit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!name.trim() || !message.trim()) { toast.error("Add the customer's name and what they said."); return; }
+    const now = new Date().toISOString();
+    onCreate({ id: nextId, customerId: "C-NEW", customerName: name.trim(), customerEmail: "", customerPhone: "—", category, priority, status: "open", subject: message.trim().slice(0, 60), description: "Raised from the console (sample).", message: message.trim(), language, amount: amt, createdAt: now, updatedAt: now, assignedTo: "Customer understanding", channel: "web" });
+  };
+  const field = "h-10 w-full rounded-md border border-input bg-background px-3 text-sm outline-none focus:ring-2 focus:ring-ring";
+  return (
+    <div className="fixed inset-0 z-50 grid place-items-center bg-primary/20 p-4" onClick={onClose}>
+      <form onSubmit={submit} onClick={(e) => e.stopPropagation()} role="dialog" aria-modal="true" aria-label="Raise a ticket" className="w-full max-w-md space-y-3 rounded-2xl border border-border bg-card p-6 shadow-2xl">
+        <div className="flex items-center justify-between"><h2 className="text-lg font-bold text-primary">Raise a ticket</h2><button type="button" onClick={onClose} aria-label="Close" className="rounded-md p-1.5 hover:bg-accent"><X className="h-4 w-4" /></button></div>
+        <label className="block text-sm font-medium">Customer or merchant name<input autoFocus className={cn(field, "mt-1")} value={name} onChange={(e) => setName(e.target.value)} /></label>
+        <div className="grid grid-cols-2 gap-3">
+          <label className="block text-sm font-medium">Language
+            <select className={cn(field, "mt-1")} value={language} onChange={(e) => setLanguage(e.target.value as FxTicket["language"])}>
+              <option value="en">English</option><option value="hi">Hindi</option><option value="mr">Marathi</option>
+            </select></label>
+          <label className="block text-sm font-medium">Category
+            <select className={cn(field, "mt-1")} value={category} onChange={(e) => setCategory(e.target.value as TicketCategory)}>
+              {(Object.keys(CATEGORY_LABELS) as TicketCategory[]).map((c) => <option key={c} value={c}>{CATEGORY_LABELS[c]}</option>)}
+            </select></label>
+        </div>
+        <label className="block text-sm font-medium">Amount in ₹ (optional)<input inputMode="numeric" className={cn(field, "mt-1")} value={amount} onChange={(e) => setAmount(e.target.value.replace(/[^\d]/g, ""))} /></label>
+        <label className="block text-sm font-medium">What they said<textarea rows={3} className={cn(field, "mt-1 h-auto py-2")} value={message} onChange={(e) => setMessage(e.target.value)} placeholder="e.g. Paise kat gaye lekin order fail" /></label>
+        <p className="text-xs text-muted-foreground">Priority by rule: <span className="font-semibold text-foreground">{PRIORITY_LABELS[priority]}</span> (category plus amount; a model never sets it).</p>
+        <div className="flex justify-end gap-2 pt-1"><Button type="button" variant="outline" onClick={onClose}>Cancel</Button><Button type="submit">Raise ticket</Button></div>
+      </form>
     </div>
   );
 }

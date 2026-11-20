@@ -45,13 +45,15 @@ export default {
           DEFAULT: "hsl(var(--card))",
           foreground: "hsl(var(--card-foreground))",
         },
+        // Paytm-style brand scale: sky #00BAF2, navy #002970
         fixchain: {
-          50: "#f0f9ff",
-          100: "#e0f2fe",
-          500: "#0ea5e9",
-          600: "#0284c7",
-          900: "#0c4a6e",
+          50: "#E6F7FE",
+          100: "#CCEFFD",
+          500: "#00BAF2",
+          600: "#0098CC",
+          900: "#002970",
         },
+        sky: { DEFAULT: "hsl(var(--sky))" },
       },
       borderRadius: {
         lg: "var(--radius)",

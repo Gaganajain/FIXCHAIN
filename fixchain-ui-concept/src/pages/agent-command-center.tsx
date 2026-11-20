@@ -1,367 +1,182 @@
-"use client";
-
-import { useState } from "react";
-import { motion } from "framer-motion";
-import { ReactFlow, Controls, Background, useReactFlow, Edge } from "reactflow";
+import { useEffect, useMemo, useState } from "react";
+import ReactFlow, { Background, Controls, Edge, Handle, MarkerType, Node, NodeProps, Position } from "reactflow";
 import "reactflow/dist/style.css";
-import {
-  Bot,
-  Activity,
-  CheckCircle2,
-  Zap,
-  Brain,
-  ShieldCheck,
-  Users,
-  Heading,
-  Layout,
-} from "lucide-react";
+import { Activity, Bot, Brain, CheckCircle2, MessageSquare, Pause, Play, Search, ShieldCheck, Sparkles, Users, Wrench, Zap } from "lucide-react";
+import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
-import {
-  Card,
-  CardContent,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Stat } from "@/components/ui/stat";
 import { Button } from "@/lib/shadcn";
 import { cn } from "@/lib/utils";
 
-const agents = [
-  {
-    id: "agent-1",
-    name: "Customer Understanding",
-    role: "customer_understanding",
-    status: "completed" as const,
-    currentTask: "Analyzed 2,847 incoming tickets",
-    progress: 100,
-    completedTasks: 2847,
-    failedTasks: 0,
-    handoffs: 2847,
-    lastActive: "2m ago",
-    x: 250,
-    y: 100,
-    icon: Bot,
-    color: "text-blue-600",
-  },
-  {
-    id: "agent-2",
-    name: "Intelligent Triage",
-    role: "triage",
-    status: "running" as const,
-    currentTask: "Prioritizing 45 new tickets",
-    progress: 72,
-    completedTasks: 32,
-    failedTasks: 0,
-    handoffs: 12,
-    lastActive: "active",
-    x: 500,
-    y: 100,
-    icon: Zap,
-    color: "text-indigo-600",
-  },
-  {
-    id: "agent-3",
-    name: "Incident Intelligence",
-    role: "incident_intelligence",
-    status: "running" as const,
-    currentTask: "Clustering 4 related incidents",
-    progress: 58,
-    completedTasks: 3,
-    failedTasks: 0,
-    handoffs: 3,
-    lastActive: "active",
-    x: 750,
-    y: 100,
-    icon: Brain,
-    color: "text-purple-600",
-  },
-  {
-    id: "agent-4",
-    name: "Investigation",
-    role: "investigation",
-    status: "waiting" as const,
-    currentTask: "Awaiting incident intelligence data",
-    progress: 0,
-    completedTasks: 0,
-    failedTasks: 0,
-    handoffs: 0,
-    lastActive: "queued",
-    x: 250,
-    y: 300,
-    icon: ShieldCheck,
-    color: "text-amber-600",
-  },
-  {
-    id: "agent-5",
-    name: "Resolution",
-    role: "resolution",
-    status: "idle" as const,
-    currentTask: "Ready to propose fixes",
-    progress: 0,
-    completedTasks: 12,
-    failedTasks: 0,
-    handoffs: 0,
-    lastActive: "1h ago",
-    x: 500,
-    y: 300,
-    icon: CheckCircle2,
-    color: "text-emerald-600",
-  },
-  {
-    id: "agent-6",
-    name: "Verification",
-    role: "verification",
-    status: "idle" as const,
-    currentTask: "Standing by for validation",
-    progress: 0,
-    completedTasks: 8,
-    failedTasks: 0,
-    handoffs: 0,
-    lastActive: "45m ago",
-    x: 750,
-    y: 300,
-    icon: Activity,
-    color: "text-cyan-600",
-  },
-  {
-    id: "agent-7",
-    name: "Learning",
-    role: "learning",
-    status: "idle" as const,
-    currentTask: "Processing resolved patterns",
-    progress: 0,
-    completedTasks: 156,
-    failedTasks: 0,
-    handoffs: 0,
-    lastActive: "3h ago",
-    x: 100,
-    y: 300,
-    icon: Heading,
-    color: "text-violet-600",
-  },
-  {
-    id: "agent-8",
-    name: "Engineering Remediation",
-    role: "engineering_remediation",
-    status: "idle" as const,
-    currentTask: "No active patches",
-    progress: 0,
-    completedTasks: 4,
-    failedTasks: 0,
-    handoffs: 0,
-    lastActive: "6h ago",
-    x: 100,
-    y: 100,
-    icon: Layout,
-    color: "text-rose-600",
-  },
-  {
-    id: "agent-9",
-    name: "Human Ops Copilot",
-    role: "human_operations",
-    status: "idle" as const,
-    currentTask: "Monitoring approvals",
-    progress: 0,
-    completedTasks: 6,
-    failedTasks: 0,
-    handoffs: 0,
-    lastActive: "1h ago",
-    x: 100,
-    y: 500,
-    icon: Users,
-    color: "text-gray-600",
-  },
+type Status = "idle" | "running" | "completed" | "waiting" | "failed";
+type AgentDef = { id: string; name: string; does: string; icon: typeof Bot; done: number; x: number; y: number };
+
+/** Mirrors the backend agents (backend/app/ops/runtime.py). The main path runs left to right. */
+const AGENTS: AgentDef[] = [
+  { id: "understand", name: "Customer understanding", does: "Reads the complaint in English, Hindi or Marathi and extracts amount, UTR and device", icon: MessageSquare, done: 300, x: 0, y: 0 },
+  { id: "triage", name: "Triage", does: "Sets severity and deadline by rule, never by model", icon: Zap, done: 300, x: 300, y: 0 },
+  { id: "intel", name: "Incident intelligence", does: "Groups related tickets into one parent incident", icon: Brain, done: 296, x: 600, y: 0 },
+  { id: "investigate", name: "Investigation", does: "Keeps facts separate from hypotheses", icon: Search, done: 5, x: 900, y: 0 },
+  { id: "resolve", name: "Resolution", does: "Proposes playbook actions; the policy engine decides the tier", icon: ShieldCheck, done: 164, x: 900, y: 190 },
+  { id: "verify", name: "Verification", does: "Closes a ticket only with a named proof source", icon: CheckCircle2, done: 164, x: 600, y: 190 },
+  { id: "comms", name: "Customer communication", does: "Updates the customer in their own language", icon: Users, done: 164, x: 300, y: 190 },
+  { id: "learn", name: "Learning", does: "Turns verified outcomes into proposals a person approves", icon: Sparkles, done: 2, x: 0, y: 190 },
+  { id: "engineering", name: "Engineering remediation", does: "Reproduce, patch, 22 locked tests, approval, post-fix replay", icon: Wrench, done: 1, x: 1200, y: 95 },
+];
+const PIPELINE = ["understand", "triage", "intel", "investigate", "resolve", "verify", "comms", "learn"];
+const EDGES: [string, string, string][] = [
+  ["understand", "triage", "300 tickets"], ["triage", "intel", "300 triaged"], ["intel", "investigate", "5 incidents"],
+  ["investigate", "resolve", "4 operational"], ["investigate", "engineering", "1 code defect"], ["resolve", "verify", "actions run"],
+  ["verify", "comms", "164 verified"], ["comms", "learn", "outcomes"],
 ];
 
-const edges: Edge[] = [
-  { id: "e1-2", source: "agent-1", target: "agent-2", label: "2,847 tickets" },
-  { id: "e2-3", source: "agent-2", target: "agent-3", label: "45 prioritized" },
-  { id: "e2-4", source: "agent-2", target: "agent-4", label: "12 critical" },
-  { id: "e3-4", source: "agent-3", target: "agent-4", label: "4 clusters" },
-  { id: "e4-5", source: "agent-4", target: "agent-5", label: "3 investigations" },
-  { id: "e5-6", source: "agent-5", target: "agent-6", label: "2 resolutions" },
-  { id: "e6-7", source: "agent-6", target: "agent-7", label: "1 verified" },
-  { id: "e8-2", source: "agent-8", target: "agent-2", label: "Patch feedback" },
-  { id: "e9-2", source: "agent-9", target: "agent-2", label: "Override input" },
-];
-
-const statusColors: Record<string, string> = {
-  running: "border-blue-500/50 bg-blue-500/5 text-blue-600 animate-pulse",
-  completed: "border-emerald-500/50 bg-emerald-500/5 text-emerald-600",
-  failed: "border-destructive/50 bg-destructive/5 text-destructive",
-  waiting: "border-amber-500/50 bg-amber-500/5 text-amber-600",
-  idle: "border-slate-500/50 bg-slate-500/5 text-slate-600",
+const STATUS: Record<Status, string> = {
+  running: "border-[#00BAF2] bg-[#E6F7FE]",
+  completed: "border-emerald-500/50 bg-emerald-50",
+  waiting: "border-amber-500/50 bg-amber-50",
+  failed: "border-destructive/50 bg-destructive/5",
+  idle: "border-border bg-card",
 };
+const STATUS_LABEL: Record<Status, string> = { running: "Working", completed: "Done", waiting: "Waiting for approval", failed: "Failed", idle: "Idle" };
 
-const nodeTypes: Record<string, React.FC<any>> = {
-  agentCard: ({ id, data }: any) => {
-    const agent = agents.find((a) => a.id === id);
-    if (!agent) return null;
-    const statusColor = statusColors[agent.status];
-    const Icon = agent.icon;
-    return (
-      <motion.div
-        whileHover={{ scale: 1.02 }}
-        className={cn(
-          "w-72 rounded-xl border p-4 shadow-sm transition-all bg-card",
-          statusColor,
-        )}
-      >
-        <div className="flex items-start gap-3 mb-3">
-          <div className="h-10 w-10 rounded-xl bg-primary/10 flex items-center justify-center text-primary">
-            <Icon className="h-5 w-5" />
-          </div>
-          <div className="flex-1">
-            <div className="flex items-baseline gap-2">
-              <h3 className="text-sm font-bold">{agent.name}</h3>
-              <Badge variant="outline" className="text-xs">
-                {agent.status}
-              </Badge>
-            </div>
-            <p className="text-xs text-muted-foreground">{agent.role.replace(/_/g, " ")}</p>
-          </div>
+type NodeData = { agent: AgentDef; status: Status };
+
+function AgentNode({ data }: NodeProps<NodeData>) {
+  const { agent, status } = data;
+  const Icon = agent.icon;
+  return (
+    <div className={cn("w-60 rounded-xl border-2 p-3 shadow-sm transition-colors", STATUS[status])}>
+      <Handle type="target" position={Position.Left} className="!h-2 !w-2 !border-0 !bg-primary/40" />
+      <Handle type="target" id="top" position={Position.Top} className="!h-2 !w-2 !border-0 !bg-primary/40" />
+      <div className="flex items-start gap-2.5">
+        <span className={cn("grid h-9 w-9 shrink-0 place-items-center rounded-lg", status === "running" ? "bg-[#00BAF2] text-white" : "bg-primary/10 text-primary")}>
+          <Icon className="h-[18px] w-[18px]" />
+        </span>
+        <div className="min-w-0">
+          <div className="text-sm font-semibold leading-tight text-primary">{agent.name}</div>
+          <div className="mt-0.5 text-[11px] font-medium text-muted-foreground">{STATUS_LABEL[status]}, {agent.done} done</div>
         </div>
-        <div className="space-y-2">
-          <div className="flex justify-between text-xs text-muted-foreground mb-1">
-            <span>Current Task</span>
-            <span className="text-sm font-medium">{agent.currentTask}</span>
-          </div>
-          <div className="h-1.5 w-full bg-muted/50 rounded-full overflow-hidden">
-            <div
-              className="h-full bg-primary"
-              style={{ width: `${agent.progress}%` }}
-            />
-          </div>
-          <div className="grid grid-cols-3 gap-2 text-xs">
-            <div className="p-1.5 rounded-lg bg-muted/50 text-center">
-              <div className="text-xs font-bold text-muted-foreground">{agent.completedTasks}</div>
-              <div className="text-[10px] text-muted-foreground">Completed</div>
-            </div>
-            <div className="p-1.5 rounded-lg bg-muted/50 text-center">
-              <div className="text-xs font-bold text-muted-foreground">{agent.failedTasks}</div>
-              <div className="text-[10px] text-muted-foreground">Failed</div>
-            </div>
-            <div className="p-1.5 rounded-lg bg-muted/50 text-center">
-              <div className="text-xs font-bold text-muted-foreground">{agent.handoffs}</div>
-              <div className="text-[10px] text-muted-foreground">Handoffs</div>
-            </div>
-          </div>
-          <div className="flex items-center justify-between text-xs text-muted-foreground mt-2">
-            <span>Last Active</span>
-            <span>{agent.lastActive}</span>
-          </div>
-        </div>
-      </motion.div>
-    );
-  },
-};
+      </div>
+      <p className="mt-2 text-[11.5px] leading-snug text-muted-foreground">{agent.does}</p>
+      <Handle type="source" position={Position.Right} className="!h-2 !w-2 !border-0 !bg-primary/40" />
+      <Handle type="source" id="bottom" position={Position.Bottom} className="!h-2 !w-2 !border-0 !bg-primary/40" />
+    </div>
+  );
+}
+// Defined once, outside render, as React Flow requires.
+const nodeTypes = { agentCard: AgentNode };
 
 export function AgentCommandCenter() {
-  const { setNodes, setEdges, getNodes } = useReactFlow();
+  const [step, setStep] = useState(-1); // index into PIPELINE while a run is playing
+  const [running, setRunning] = useState(false);
+  const [live, setLive] = useState(true);
+
+  useEffect(() => {
+    if (!running) return;
+    const t = setInterval(() => {
+      setStep((s) => {
+        if (s >= PIPELINE.length - 1) { setRunning(false); toast.success("Run finished: every step handed off and was verified"); return s; }
+        return s + 1;
+      });
+    }, 1100);
+    return () => clearInterval(t);
+  }, [running]);
+
+  const statusOf = (id: string): Status => {
+    if (id === "engineering") return "waiting";
+    if (step < 0) return id === "triage" || id === "intel" ? "running" : "idle";
+    const i = PIPELINE.indexOf(id);
+    return i < step ? "completed" : i === step ? "running" : "idle";
+  };
+
+  const nodes: Node<NodeData>[] = useMemo(
+    () => AGENTS.map((a) => ({ id: a.id, type: "agentCard", position: { x: a.x, y: a.y }, data: { agent: a, status: statusOf(a.id) }, draggable: false })),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [step],
+  );
+  const edges: Edge[] = useMemo(() => EDGES.map(([s, t, label]) => {
+    const active = live && (statusOf(s) === "running" || statusOf(t) === "running");
+    const sameRowBack = AGENTS.find((a) => a.id === s)!.y === 190 && AGENTS.find((a) => a.id === t)!.y === 190;
+    const down = s === "investigate" && t === "resolve";
+    return {
+      id: `${s}-${t}`, source: s, target: t, label,
+      sourceHandle: down ? "bottom" : undefined, targetHandle: down ? "top" : undefined,
+      animated: active,
+      type: sameRowBack ? "straight" : "smoothstep",
+      style: { stroke: active ? "#00BAF2" : "#94A3B8", strokeWidth: active ? 2 : 1.5 },
+      markerEnd: { type: MarkerType.ArrowClosed, color: active ? "#00BAF2" : "#94A3B8" },
+      labelStyle: { fontSize: 11, fill: "#475569" },
+      labelBgStyle: { fill: "#F8FAFC" },
+    } as Edge;
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }), [step, live]);
+
+  const working = AGENTS.filter((a) => statusOf(a.id) === "running").length;
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+      <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight">AI Agent Command Center</h1>
-          <p className="text-muted-foreground">Visual orchestration of AI agents across the incident resolution pipeline</p>
+          <h1 className="text-2xl font-bold tracking-tight text-primary">Agents</h1>
+          <p className="text-muted-foreground">Each agent does one job and hands off. Consequential steps stop for a person.</p>
         </div>
         <div className="flex gap-2">
-          <Button variant="outline" size="sm" onClick={() => {}}>
-            <Activity className="mr-1 h-3 w-3" /> Live Mode
+          <Button variant="outline" size="sm" onClick={() => setLive((v) => !v)} aria-pressed={live}>
+            <Activity className="mr-1.5 h-3.5 w-3.5" /> {live ? "Animate handoffs: on" : "Animate handoffs: off"}
           </Button>
-          <Button size="sm" onClick={() => {}}>
-            <Zap className="mr-1 h-3 w-3" /> Run Pipeline
+          <Button size="sm" onClick={() => { if (running) { setRunning(false); return; } setStep(0); setRunning(true); }}>
+            {running ? <><Pause className="mr-1.5 h-3.5 w-3.5" /> Pause run</> : <><Play className="mr-1.5 h-3.5 w-3.5" /> Replay a ticket's journey</>}
           </Button>
         </div>
       </div>
 
-      {/* Agent Status Summary */}
-      <div className="grid grid-cols-3 gap-4">
-        {[
-          { label: "Active Agents", value: agents.filter((a) => a.status === "running").length, color: "text-blue-600" },
-          { label: "Completed Tasks", value: agents.reduce((a, b) => a + b.completedTasks, 0), color: "text-emerald-600" },
-          { label: "Failed Tasks", value: agents.reduce((a, b) => a + b.failedTasks, 0), color: "text-destructive" },
-        ].map((stat) => (
-          <Card key={stat.label} className="p-4">
-            <CardContent>
-              <div className="text-2xl font-bold {stat.color}">{stat.value}</div>
-              <div className="text-xs text-muted-foreground mt-1">{stat.label}</div>
-            </CardContent>
-          </Card>
-        ))}
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+        <Stat label="Working now" value={working} tone="sky" sub="Agents with a task running" />
+        <Stat label="Tasks completed" value={AGENTS.reduce((a, b) => a + b.done, 0).toLocaleString("en-IN")} tone="good" sub="Across all agents today" />
+        <Stat label="Waiting for a person" value={1} tone="warn" sub="Verified patch for INC-001" />
       </div>
 
-      {/* React Flow Workflow */}
       <Card>
         <CardHeader>
-          <CardTitle className="text-sm font-medium">Agent Workflow Graph</CardTitle>
+          <CardTitle className="text-base font-semibold text-primary">How a complaint moves through FIXCHAIN</CardTitle>
+          <CardDescription>The top row hears and groups; the bottom row fixes and closes the loop. A code defect branches to engineering remediation.</CardDescription>
         </CardHeader>
-        <CardContent className="p-0 h-[600px]">
-          <div className="relative h-full w-full">
-            <ReactFlow
-              nodes={agents.map((a) => ({
-                id: a.id,
-                type: "agentCard",
-                position: { x: a.x, y: a.y },
-                data: { label: a.name },
-              }))}
-              edges={edges}
-              fitView
-              panOnScroll
-              onInit={() => {
-                setNodes(agents.map((a) => ({
-                  id: a.id,
-                  type: "agentCard",
-                  position: { x: a.x, y: a.y },
-                  data: { label: a.name },
-                })));
-                setEdges(edges);
-              }}
-            >
-              <Controls />
-              <Background gap={12} />
-            </ReactFlow>
-          </div>
+        <CardContent className="h-[460px] p-0">
+          <ReactFlow
+            nodes={nodes}
+            edges={edges}
+            nodeTypes={nodeTypes}
+            fitView
+            fitViewOptions={{ padding: 0.15 }}
+            nodesConnectable={false}
+            proOptions={{ hideAttribution: true }}
+            minZoom={0.3}
+          >
+            <Controls showInteractive={false} />
+            <Background gap={16} color="#E2E8F0" />
+          </ReactFlow>
         </CardContent>
       </Card>
 
-      {/* Agent Detail Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        {agents.map((agent) => {
-          const statusColor = statusColors[agent.status];
+      <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
+        {AGENTS.map((agent) => {
+          const st = statusOf(agent.id);
           const Icon = agent.icon;
           return (
-            <motion.div
-              key={agent.id}
-              whileHover={{ y: -2 }}
-              className={cn(
-                "rounded-xl border p-4 transition-all",
-                statusColor,
-              )}
-            >
+            <div key={agent.id} className={cn("rounded-xl border p-4 transition-colors", STATUS[st])}>
               <div className="flex items-start gap-3">
-                <div className="h-10 w-10 rounded-xl bg-primary/10 flex items-center justify-center text-primary shrink-0">
-                  <Icon className="h-5 w-5" />
-                </div>
-                <div className="flex-1">
-                  <div className="flex items-baseline gap-2 mb-1">
-                    <h3 className="text-sm font-bold">{agent.name}</h3>
-                    <Badge variant="outline" className="text-xs">{agent.status}</Badge>
+                <span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-primary/10 text-primary"><Icon className="h-5 w-5" /></span>
+                <div className="min-w-0 flex-1">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <h3 className="text-sm font-semibold text-primary">{agent.name}</h3>
+                    <Badge variant="outline" className="text-[11px]">{STATUS_LABEL[st]}</Badge>
                   </div>
-                  <p className="text-xs text-muted-foreground">{agent.currentTask}</p>
+                  <p className="mt-1 text-xs text-muted-foreground">{agent.does}</p>
                 </div>
               </div>
-              <div className="mt-3 h-1.5 w-full bg-muted/50 rounded-full overflow-hidden">
-                <div
-                  className="h-full bg-primary"
-                  style={{ width: `${agent.progress}%` }}
-                />
-              </div>
-              <div className="mt-2 flex justify-between text-xs text-muted-foreground">
-                <span>{agent.completedTasks} completed</span>
-                <span>{agent.handoffs} handoffs</span>
-              </div>
-            </motion.div>
+              <div className="mt-3 text-xs text-muted-foreground">{agent.done.toLocaleString("en-IN")} tasks completed</div>
+            </div>
           );
         })}
       </div>
