@@ -4,14 +4,14 @@ export function Card({ title, right, children, className = "", pad = true }: {
   title?: ReactNode; right?: ReactNode; children: ReactNode; className?: string; pad?: boolean;
 }) {
   return (
-    <section className={`rounded-xl border border-line bg-panel shadow-card ${className}`}>
+    <section className={`min-w-0 rounded-2xl border border-line bg-panel shadow-card ${className}`}>
       {title && (
-        <header className="flex items-center justify-between gap-3 border-b border-line px-4 py-2.5">
-          <h3 className="text-[13px] font-semibold text-ink">{title}</h3>
+        <header className="flex items-center justify-between gap-3 border-b border-line px-5 py-3">
+          <h3 className="text-[14px] font-bold text-brand">{title}</h3>
           {right}
         </header>
       )}
-      <div className={pad ? "p-4" : ""}>{children}</div>
+      <div className={pad ? "p-5" : ""}>{children}</div>
     </section>
   );
 }
@@ -21,7 +21,7 @@ const TONES: Record<string, string> = {
   warn: "text-warn border-warn/40 bg-warn/10",
   serious: "text-serious border-serious/40 bg-serious/10",
   critical: "text-critical border-critical/50 bg-critical/10",
-  accent: "text-brand-2 border-accent/50 bg-accent/10",
+  accent: "text-brand border-accent/60 bg-accent/10",
   neutral: "text-ink-2 border-line bg-raised",
 };
 const ICONS: Record<string, string> = { good: "✓", warn: "!", serious: "▲", critical: "✕", accent: "●", neutral: "○" };
@@ -53,8 +53,8 @@ export function Button({ children, onClick, variant = "default", disabled, busy,
   disabled?: boolean; busy?: boolean; title?: string;
 }) {
   const styles = {
-    default: "border-line bg-panel text-brand hover:border-accent hover:text-accent",
-    primary: "border-brand bg-brand text-white hover:bg-brand-2",
+    default: "border-line bg-panel text-brand hover:border-accent hover:bg-raised",
+    primary: "border-accent bg-accent text-brand hover:brightness-105",
     good: "border-good bg-good text-white hover:brightness-110",
     danger: "border-critical/60 bg-transparent text-critical hover:bg-critical/10",
     ghost: "border-transparent bg-transparent text-ink-2 hover:text-ink",
@@ -93,10 +93,10 @@ export function ErrorBar({ error }: { error: string | null }) {
 
 export function Kpi({ label, value, sub, tone }: { label: string; value: ReactNode; sub?: ReactNode; tone?: string }) {
   return (
-    <div className="rounded-xl border border-line bg-panel px-4 py-3 shadow-card">
+    <div className="rounded-2xl border border-line bg-panel px-5 py-4 shadow-card">
       <div className="text-[11px] font-medium uppercase tracking-wider text-ink-3">{label}</div>
-      <div className="mt-1 flex items-baseline gap-2">
-        <span className="text-2xl font-semibold tabular-nums text-ink">{value}</span>
+      <div className="mt-1 flex flex-wrap items-baseline gap-x-2 gap-y-1">
+        <span className="text-[26px] font-extrabold tabular-nums tracking-tight text-brand">{value}</span>
         {tone && <Badge tone={tone}>{{ good: "Healthy", warn: "Degraded", serious: "At risk", critical: "Critical" }[tone] ?? ""}</Badge>}
       </div>
       {sub && <div className="mt-0.5 text-[12px] text-ink-3">{sub}</div>}

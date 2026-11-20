@@ -4,6 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>FIXCHAIN · Payment integration bugs, fixed and verified</title>
+<meta name="theme-color" content="#002E6E">
 <meta name="description" content="FIXCHAIN detects, diagnoses, patches and verifies merchant-side payment integration bugs, with an independent test suite and human approval.">
 <meta property="og:title" content="FIXCHAIN: the autonomous reliability engineer for payment integrations">
 <meta property="og:description" content="Detects, diagnoses, patches and verifies merchant-side payment bugs before a paid order turns into a refund.">
@@ -11,10 +12,11 @@
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;700&family=Inter:wght@400;600;700&family=JetBrains+Mono:wght@500;600&display=swap">
 <style>
   :root {
-    --ink: #0E1A2B; --ink-2: #16263D; --line-d: #2A3B55;
-    --paper: #F6F5F0; --card: #FDFCF8; --line: #D9DCE3;
-    --teal: #19C3B2; --teal-d: #0B7068; --amber: #F2A33A; --red: #C8373C;
-    --muted: #4A5568; --muted-d: #B8C4D6;
+    /* Paytm-style palette: deep navy, sky blue, white cards on soft grey */
+    --ink: #002E6E; --ink-2: #0B3F86; --line-d: #2A5A9E;
+    --paper: #F5F7FA; --card: #FFFFFF; --line: #E3E9F1;
+    --teal: #00BAF2; --teal-d: #0072BC; --amber: #F5A623; --red: #C62828;
+    --muted: #4A5A72; --muted-d: #C9D8EE;
     --display: 'Space Grotesk', Arial, sans-serif;
     --body: 'Inter', Arial, sans-serif;
     --mono: 'JetBrains Mono', 'Courier New', monospace;
@@ -32,7 +34,7 @@
   h3 { font-size: 21px; line-height: 1.25; }
   p { margin: 0; }
   .muted { color: var(--muted); }
-  .dark { background: var(--ink); color: var(--paper); }
+  .dark { background: var(--ink); color: #FFFFFF; }
   .dark .muted { color: var(--muted-d); }
   section { padding: 96px 0; scroll-margin-top: 64px; }
 
@@ -41,32 +43,34 @@
   .btn:hover { transform: translateY(-1px); }
   .btn:focus-visible { outline: 3px solid var(--amber); outline-offset: 3px; }
   .btn-primary { background: var(--teal); color: var(--ink); }
-  .btn-primary:hover { background: #2ED6C5; }
-  .btn-ghost { border-color: var(--line-d); color: var(--paper); }
-  .btn-ghost:hover { border-color: var(--teal); }
+  .btn-primary:hover { background: #33C8F5; }
+  .btn-ghost { border-color: var(--ink); color: var(--ink); }
+  .btn-ghost:hover { background: #EAF7FE; }
+  .dark .btn-ghost { border-color: rgba(255,255,255,.45); color: #FFFFFF; }
+  .dark .btn-ghost:hover { background: rgba(255,255,255,.08); border-color: var(--teal); }
   .btn-dark { background: var(--ink); color: var(--paper); }
 
   /* nav */
-  nav { position: sticky; top: 0; z-index: 10; background: rgba(14, 26, 43, .92); backdrop-filter: blur(8px); border-bottom: 1px solid var(--line-d); }
+  nav { position: sticky; top: 0; z-index: 10; background: rgba(255, 255, 255, .96); backdrop-filter: blur(8px); border-bottom: 1px solid var(--line); box-shadow: 0 2px 12px rgba(0,46,110,.05); }
   nav .wrap { display: flex; align-items: center; gap: 28px; height: 64px; }
-  .logo { font: 700 22px var(--display); color: var(--paper); text-decoration: none; letter-spacing: -.02em; }
-  .logo span { color: var(--teal); }
+  .logo { font: 700 22px var(--display); color: var(--ink); text-decoration: none; letter-spacing: -.02em; }
+  .logo span { color: var(--teal-d); }
   nav .links { display: flex; gap: 22px; margin-left: auto; }
-  nav .links a { color: var(--muted-d); text-decoration: none; font-size: 15px; }
-  nav .links a:hover { color: var(--paper); }
+  nav .links a { color: var(--muted); text-decoration: none; font-size: 15px; font-weight: 600; }
+  nav .links a:hover { color: var(--ink); }
   nav .btn { padding: 10px 18px; font-size: 15px; }
 
   /* hero */
-  .hero { padding: 88px 0 104px; }
+  .hero { padding: 88px 0 104px; background: linear-gradient(180deg, #EAF7FE 0%, #F5F7FA 100%); }
   .hero .wrap { display: grid; grid-template-columns: 1.05fr .95fr; gap: 56px; align-items: center; }
   .hero h1 { font-size: clamp(40px, 5.6vw, 66px); }
-  .hero h1 em { font-style: normal; color: var(--teal); }
+  .hero h1 em { font-style: normal; color: var(--teal-d); }
   .hero .lead { font-size: 19px; margin: 22px 0 32px; max-width: 540px; }
   .hero .ctas { display: flex; flex-wrap: wrap; gap: 12px; }
-  .hero .note { margin-top: 22px; font: 500 13px/1.5 var(--mono); color: var(--muted-d); }
+  .hero .note { margin-top: 22px; font: 500 13px/1.5 var(--mono); color: var(--muted); }
 
   /* live pipeline card */
-  .console { background: var(--ink-2); border: 1px solid var(--line-d); border-radius: 18px; padding: 22px; box-shadow: 0 30px 80px rgba(0,0,0,.35); }
+  .console { background: var(--ink); color: #FFFFFF; border: 1px solid var(--line-d); border-radius: 22px; padding: 22px; box-shadow: 0 24px 60px rgba(0,46,110,.25); }
   .console-head { display: flex; justify-content: space-between; align-items: center; font: 500 13px var(--mono); color: var(--muted-d); margin-bottom: 16px; }
   .dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: var(--teal); margin-right: 8px; animation: pulse 1.6s ease-in-out infinite; }
   .steps { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
@@ -90,7 +94,7 @@
 
   /* problem story */
   .story { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; margin-top: 40px; }
-  .story .card { background: var(--card); border: 1px solid var(--line); border-radius: 16px; padding: 24px; }
+  .story .card { background: var(--card); border: 1px solid var(--line); border-radius: 20px; padding: 24px; box-shadow: 0 6px 20px rgba(0,46,110,.05); }
   .story .n { font: 600 13px var(--mono); color: var(--teal-d); margin-bottom: 12px; }
   .story .card.bad .n { color: var(--red); }
   .story h3 { margin-bottom: 8px; }
@@ -98,7 +102,7 @@
 
   /* how it works */
   .pipeline { display: grid; grid-template-columns: repeat(7, 1fr); gap: 10px; margin-top: 40px; }
-  .chip { background: var(--ink-2); border: 1px solid var(--line-d); border-radius: 14px; padding: 18px 14px; position: relative; }
+  .chip { background: var(--ink-2); border: 1px solid var(--line-d); border-radius: 18px; padding: 18px 14px; position: relative; }
   .chip.ai { border-color: var(--teal); }
   .chip.human { border-color: var(--amber); }
   .chip .kind { font: 600 11px var(--mono); letter-spacing: .1em; text-transform: uppercase; color: var(--muted-d); }
@@ -118,14 +122,14 @@
 
   /* safety */
   .grid4 { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; margin-top: 40px; }
-  .grid4 .card { background: var(--ink-2); border: 1px solid var(--line-d); border-radius: 16px; padding: 26px; }
+  .grid4 .card { background: var(--ink-2); border: 1px solid var(--line-d); border-radius: 20px; padding: 26px; }
   .grid4 svg { width: 30px; height: 30px; color: var(--teal); margin-bottom: 14px; }
   .grid4 h3 { margin-bottom: 8px; }
   .grid4 p { font-size: 15px; }
 
   /* audiences */
   .grid3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; margin-top: 40px; }
-  .grid3 .card { background: var(--card); border: 1px solid var(--line); border-radius: 16px; padding: 28px; display: flex; flex-direction: column; gap: 10px; }
+  .grid3 .card { background: var(--card); border: 1px solid var(--line); border-radius: 20px; padding: 28px; display: flex; flex-direction: column; gap: 10px; box-shadow: 0 6px 20px rgba(0,46,110,.05); }
   .grid3 .tag { font: 600 13px var(--mono); color: var(--teal-d); }
 
   /* cta */
@@ -178,10 +182,10 @@
   </div>
 </nav>
 
-<header class="hero dark" id="top">
+<header class="hero" id="top">
   <div class="wrap">
     <div>
-      <p class="eyebrow">Autonomous reliability for payment integrations</p>
+      <p class="eyebrow">Built for Paytm merchants · autonomous payment reliability</p>
       <h1>Payment bugs, <em>fixed and proven</em> before customers notice.</h1>
       <p class="lead muted">When a merchant’s code mishandles a gateway callback, FIXCHAIN finds the root cause, writes the fix, proves it with an independent test suite and asks a developer to approve it.</p>
       <div class="ctas">
@@ -305,7 +309,7 @@
 
 <footer class="dark">
   <div class="wrap">
-    <span class="muted">FIXCHAIN · hackathon prototype · the demo uses a simulated gateway, no real money moves</span>
+    <span class="muted">FIXCHAIN · independent hackathon project, not an official Paytm product · the demo uses a simulated gateway, no real money moves</span>
     <span><a href="https://github.com/Gaganajain/FIXCHAIN">GitHub</a> · <a href="/" data-demo>Live demo</a></span>
   </div>
 </footer>

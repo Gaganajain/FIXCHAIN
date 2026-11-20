@@ -41,46 +41,50 @@ export default function App() {
 
   return (
     <div className="flex min-h-screen bg-bg text-ink">
-      <aside className="hidden w-60 shrink-0 flex-col bg-brand text-white md:flex">
-        <div className="px-5 py-5">
+      <aside className="hidden w-64 shrink-0 flex-col border-r border-line bg-panel md:flex">
+        <div className="px-5 pb-4 pt-5">
           <div className="flex items-center gap-2.5">
-            <span className="grid h-9 w-9 place-items-center rounded-xl bg-accent font-mono text-[14px] font-bold text-brand">FX</span>
+            <span className="grid h-10 w-10 place-items-center rounded-2xl bg-accent font-mono text-[14px] font-bold text-brand">FX</span>
             <div>
-              <div className="text-[17px] font-bold tracking-wide">FIXCHAIN</div>
-              <div className="text-[11px] text-white/60">Payment reliability agent</div>
+              <div className="text-[18px] font-extrabold tracking-tight text-brand">FIXCHAIN</div>
+              <div className="text-[11.5px] font-medium text-ink-3">Payment reliability agent</div>
             </div>
           </div>
+          <div className="mt-3 inline-flex items-center gap-1.5 rounded-full bg-raised px-2.5 py-1 text-[11.5px] font-semibold text-brand">
+            <span aria-hidden className="h-1.5 w-1.5 rounded-full bg-accent" />Built for Paytm merchants
+          </div>
         </div>
-        <nav className="flex-1 space-y-1 px-3">
+        <nav className="flex-1 space-y-1 px-3" aria-label="Sections">
           {NAV.map((n) => (
-            <button key={n.id} onClick={() => setView(n.id)}
-              className={`flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left transition ${
-                view === n.id ? "bg-white/12 bg-white/10 shadow-[inset_3px_0_0_#00A8E8]" : "text-white/80 hover:bg-white/5"}`}>
-              <span aria-hidden className={`grid h-8 w-8 place-items-center rounded-lg text-[15px] ${view === n.id ? "bg-accent text-brand" : "bg-white/10"}`}>{n.icon}</span>
+            <button key={n.id} onClick={() => setView(n.id)} aria-current={view === n.id ? "page" : undefined}
+              className={`flex w-full items-center gap-3 rounded-2xl px-3 py-2.5 text-left transition ${
+                view === n.id ? "bg-raised text-brand shadow-[inset_3px_0_0_#00BAF2]" : "text-ink-2 hover:bg-bg"}`}>
+              <span aria-hidden className={`grid h-9 w-9 place-items-center rounded-xl text-[15px] ${view === n.id ? "bg-accent text-brand" : "bg-bg text-brand"}`}>{n.icon}</span>
               <span>
                 <span className="block text-[13.5px] font-semibold">{n.label}</span>
-                <span className="block text-[11px] text-white/55">{n.hint}</span>
+                <span className="block text-[11px] text-ink-3">{n.hint}</span>
               </span>
             </button>
           ))}
         </nav>
-        <div className="m-3 space-y-1.5 rounded-xl bg-white/5 p-3 text-[11px] text-white/65">
-          <div>Verifier suite {status?.verifier_suite_intact ? <span className="font-semibold text-[#7CE0A6]">✓ locked</span> : <span className="font-semibold text-[#FF9A9A]">✕ changed</span>}</div>
-          <div className="font-mono text-white/50">{status?.verifier_suite_sha256.slice(0, 16)}…</div>
+        <div className="m-3 space-y-1.5 rounded-2xl bg-brand p-3.5 text-[11px] text-white/75">
+          <div>Verifier suite {status?.verifier_suite_intact ? <span className="font-semibold text-[#8FE3B0]">✓ locked</span> : <span className="font-semibold text-[#FFB0B0]">✕ changed</span>}</div>
+          <div className="font-mono text-white/60">{status?.verifier_suite_sha256.slice(0, 16)}…</div>
           <div>Allowlist: <span className="font-mono">{status?.approved_files.join(", ")}</span></div>
         </div>
+        <p className="px-5 pb-4 text-[10.5px] leading-snug text-ink-3">Independent hackathon project, not an official Paytm product.</p>
       </aside>
 
       <div className="flex min-w-0 flex-1 flex-col">
-        <header className="flex flex-wrap items-center gap-2 border-b border-line bg-panel px-4 py-3 shadow-card md:px-6">
+        <header className="sticky top-0 z-10 flex flex-wrap items-center gap-2 border-b border-line bg-panel/95 px-4 py-3 backdrop-blur md:px-6">
           <div className="flex items-center gap-2 md:hidden">
-            <span className="grid h-7 w-7 place-items-center rounded-lg bg-brand font-mono text-[11px] font-bold text-accent">FX</span>
+            <span className="grid h-8 w-8 place-items-center rounded-xl bg-accent font-mono text-[11px] font-bold text-brand">FX</span>
             <select value={view} onChange={(e) => setView(e.target.value as View)}
               className="rounded-full border border-line bg-panel px-3 py-1 text-[13px] text-brand">
               {NAV.map((n) => <option key={n.id} value={n.id}>{n.label}</option>)}
             </select>
           </div>
-          <h1 className="hidden text-[18px] font-bold text-brand md:block">{NAV.find((n) => n.id === view)?.label}</h1>
+          <h1 className="hidden text-[20px] font-extrabold tracking-tight text-brand md:block">{NAV.find((n) => n.id === view)?.label}</h1>
           <div className="ml-auto flex flex-wrap items-center gap-2">
             <ReviewerField tokenRequired={!!status?.reviewer_token_required} />
             <Badge tone="warn">Simulated environment · no real money</Badge>

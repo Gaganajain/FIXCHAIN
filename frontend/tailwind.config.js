@@ -1,5 +1,5 @@
 /** @type {import('tailwindcss').Config} */
-// Light fintech theme: navy brand, cyan-blue highlight, white cards on a soft blue-grey ground.
+// Paytm-style light theme: deep navy brand, sky-blue accent, white rounded cards on a soft grey ground.
 export default {
   content: ["./index.html", "./src/**/*.{ts,tsx}"],
   theme: {
@@ -9,20 +9,20 @@ export default {
         mono: ["JetBrains Mono", "ui-monospace", "monospace"],
       },
       colors: {
-        bg: "#F3F6FA",
+        bg: "#F5F7FA",
         panel: "#FFFFFF",
-        raised: "#EEF3F9",
-        line: "#DCE4EE",
-        ink: { DEFAULT: "#0B1F3A", 2: "#44546A", 3: "#6B7A90" },
-        brand: { DEFAULT: "#002E6E", 2: "#0A3D85" },
-        accent: "#00A8E8",
+        raised: "#EAF7FE",
+        line: "#E3E9F1",
+        ink: { DEFAULT: "#0B1F3A", 2: "#3F4D63", 3: "#66748A" },
+        brand: { DEFAULT: "#002E6E", 2: "#0B4A9A" },
+        accent: "#00BAF2",
         good: "#0B7A33",
         warn: "#9A6200",
         serious: "#C2511F",
         critical: "#C62828",
       },
       boxShadow: {
-        card: "0 1px 2px rgba(11,31,58,0.05), 0 4px 16px rgba(11,31,58,0.04)",
+        card: "0 1px 2px rgba(0,46,110,0.05), 0 6px 20px rgba(0,46,110,0.05)",
       },
     },
   },

@@ -454,7 +454,7 @@ export function Incidents({ selected, select }: { selected: number | null; selec
             {incidents.map((i) => (
               <li key={i.id}>
                 <button onClick={() => select(i.id)}
-                  className={`w-full px-4 py-3 text-left hover:bg-raised ${current === i.id ? "bg-raised shadow-[inset_3px_0_0_#00A8E8]" : ""}`}>
+                  className={`w-full px-4 py-3 text-left hover:bg-raised ${current === i.id ? "bg-raised shadow-[inset_3px_0_0_#00BAF2]" : ""}`}>
                   <div className="flex items-center gap-2">
                     <Badge tone={severityTone(i.severity)}>{i.severity}</Badge>
                     <Badge tone={incidentTone(i.status)}>{i.status.replace("_", " ")}</Badge>
