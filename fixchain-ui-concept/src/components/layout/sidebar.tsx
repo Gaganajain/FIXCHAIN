@@ -5,6 +5,7 @@ import {
   ChevronsRight,
   FlaskConical,
   Inbox,
+  Info,
   LayoutDashboard,
   LineChart,
   LogOut,
@@ -100,8 +101,16 @@ export function Sidebar({ collapsed, setCollapsed, currentPath, width, navigate 
             <ChevronsRight className="h-5 w-5" />
           </button>
         )}
+        <a
+          href="/landing"
+          className={cn("flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium text-muted-foreground hover:bg-accent hover:text-primary", collapsed && "justify-center px-0")}
+          title={collapsed ? "About FIXCHAIN" : undefined}
+        >
+          <Info className="h-5 w-5 shrink-0" />
+          {!collapsed && <span>About FIXCHAIN</span>}
+        </a>
         <button
-          onClick={() => toast.info("This concept has no sign-in. Run the FIXCHAIN dashboard for demo roles.")}
+          onClick={() => toast.info("This demo has no sign-in. It runs on sample data.")}
           className={cn("flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium text-muted-foreground hover:bg-destructive/5 hover:text-destructive", collapsed && "justify-center px-0")}
           title={collapsed ? "Sign out" : undefined}
         >
