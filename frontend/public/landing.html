@@ -1,0 +1,329 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>FIXCHAIN · Payment integration bugs, fixed and verified</title>
+<meta name="description" content="FIXCHAIN detects, diagnoses, patches and verifies merchant-side payment integration bugs, with an independent test suite and human approval.">
+<meta property="og:title" content="FIXCHAIN: the autonomous reliability engineer for payment integrations">
+<meta property="og:description" content="Detects, diagnoses, patches and verifies merchant-side payment bugs before a paid order turns into a refund.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;700&family=Inter:wght@400;600;700&family=JetBrains+Mono:wght@500;600&display=swap">
+<style>
+  :root {
+    --ink: #0E1A2B; --ink-2: #16263D; --line-d: #2A3B55;
+    --paper: #F6F5F0; --card: #FDFCF8; --line: #D9DCE3;
+    --teal: #19C3B2; --teal-d: #0B7068; --amber: #F2A33A; --red: #C8373C;
+    --muted: #4A5568; --muted-d: #B8C4D6;
+    --display: 'Space Grotesk', Arial, sans-serif;
+    --body: 'Inter', Arial, sans-serif;
+    --mono: 'JetBrains Mono', 'Courier New', monospace;
+    --max: 1180px;
+  }
+  * { box-sizing: border-box; }
+  html { scroll-behavior: smooth; }
+  body { margin: 0; background: var(--paper); color: var(--ink); font: 17px/1.6 var(--body); -webkit-font-smoothing: antialiased; }
+  a { color: inherit; }
+  .wrap { max-width: var(--max); margin: 0 auto; padding: 0 24px; }
+  .eyebrow { font: 600 13px/1.4 var(--mono); letter-spacing: .14em; text-transform: uppercase; color: var(--teal-d); margin: 0 0 14px; }
+  .dark .eyebrow { color: var(--teal); }
+  h1, h2, h3 { font-family: var(--display); margin: 0; line-height: 1.08; letter-spacing: -.01em; }
+  h2 { font-size: clamp(30px, 4vw, 46px); }
+  h3 { font-size: 21px; line-height: 1.25; }
+  p { margin: 0; }
+  .muted { color: var(--muted); }
+  .dark { background: var(--ink); color: var(--paper); }
+  .dark .muted { color: var(--muted-d); }
+  section { padding: 96px 0; scroll-margin-top: 64px; }
+
+  /* buttons */
+  .btn { display: inline-flex; align-items: center; gap: 8px; padding: 13px 22px; border-radius: 999px; font: 600 16px/1 var(--body); text-decoration: none; border: 2px solid transparent; transition: transform .15s ease, background-color .15s ease, border-color .15s ease; }
+  .btn:hover { transform: translateY(-1px); }
+  .btn:focus-visible { outline: 3px solid var(--amber); outline-offset: 3px; }
+  .btn-primary { background: var(--teal); color: var(--ink); }
+  .btn-primary:hover { background: #2ED6C5; }
+  .btn-ghost { border-color: var(--line-d); color: var(--paper); }
+  .btn-ghost:hover { border-color: var(--teal); }
+  .btn-dark { background: var(--ink); color: var(--paper); }
+
+  /* nav */
+  nav { position: sticky; top: 0; z-index: 10; background: rgba(14, 26, 43, .92); backdrop-filter: blur(8px); border-bottom: 1px solid var(--line-d); }
+  nav .wrap { display: flex; align-items: center; gap: 28px; height: 64px; }
+  .logo { font: 700 22px var(--display); color: var(--paper); text-decoration: none; letter-spacing: -.02em; }
+  .logo span { color: var(--teal); }
+  nav .links { display: flex; gap: 22px; margin-left: auto; }
+  nav .links a { color: var(--muted-d); text-decoration: none; font-size: 15px; }
+  nav .links a:hover { color: var(--paper); }
+  nav .btn { padding: 10px 18px; font-size: 15px; }
+
+  /* hero */
+  .hero { padding: 88px 0 104px; }
+  .hero .wrap { display: grid; grid-template-columns: 1.05fr .95fr; gap: 56px; align-items: center; }
+  .hero h1 { font-size: clamp(40px, 5.6vw, 66px); }
+  .hero h1 em { font-style: normal; color: var(--teal); }
+  .hero .lead { font-size: 19px; margin: 22px 0 32px; max-width: 540px; }
+  .hero .ctas { display: flex; flex-wrap: wrap; gap: 12px; }
+  .hero .note { margin-top: 22px; font: 500 13px/1.5 var(--mono); color: var(--muted-d); }
+
+  /* live pipeline card */
+  .console { background: var(--ink-2); border: 1px solid var(--line-d); border-radius: 18px; padding: 22px; box-shadow: 0 30px 80px rgba(0,0,0,.35); }
+  .console-head { display: flex; justify-content: space-between; align-items: center; font: 500 13px var(--mono); color: var(--muted-d); margin-bottom: 16px; }
+  .dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: var(--teal); margin-right: 8px; animation: pulse 1.6s ease-in-out infinite; }
+  .steps { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
+  .steps li { display: grid; grid-template-columns: 74px 1fr auto; gap: 12px; align-items: center; padding: 10px 14px; border-radius: 10px; background: rgba(255,255,255,.03); border: 1px solid transparent; font-size: 15px; opacity: .45; animation: stepOn 9s infinite; }
+  .steps li .kind { font: 600 11px var(--mono); letter-spacing: .1em; text-transform: uppercase; color: var(--muted-d); }
+  .steps li.ai .kind { color: var(--teal); }
+  .steps li.human .kind { color: var(--amber); }
+  .steps li .state { font: 600 12px var(--mono); color: var(--teal); }
+  .steps li:nth-child(1) { animation-delay: 0s; } .steps li:nth-child(2) { animation-delay: .9s; }
+  .steps li:nth-child(3) { animation-delay: 1.8s; } .steps li:nth-child(4) { animation-delay: 2.7s; }
+  .steps li:nth-child(5) { animation-delay: 3.6s; } .steps li:nth-child(6) { animation-delay: 4.5s; }
+  .steps li:nth-child(7) { animation-delay: 5.4s; }
+  .tests { margin-top: 16px; display: flex; justify-content: space-between; align-items: center; padding: 14px; border-radius: 10px; background: rgba(25,195,178,.08); border: 1px solid rgba(25,195,178,.35); font: 500 14px var(--mono); }
+  .tests b { font: 700 22px var(--display); color: var(--teal); }
+  @keyframes stepOn {
+    0%, 4% { opacity: .45; border-color: transparent; }
+    8%, 88% { opacity: 1; border-color: var(--line-d); }
+    96%, 100% { opacity: .45; border-color: transparent; }
+  }
+  @keyframes pulse { 50% { opacity: .35; } }
+
+  /* problem story */
+  .story { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; margin-top: 40px; }
+  .story .card { background: var(--card); border: 1px solid var(--line); border-radius: 16px; padding: 24px; }
+  .story .n { font: 600 13px var(--mono); color: var(--teal-d); margin-bottom: 12px; }
+  .story .card.bad .n { color: var(--red); }
+  .story h3 { margin-bottom: 8px; }
+  .callout { margin-top: 32px; font-size: 19px; max-width: 820px; }
+
+  /* how it works */
+  .pipeline { display: grid; grid-template-columns: repeat(7, 1fr); gap: 10px; margin-top: 40px; }
+  .chip { background: var(--ink-2); border: 1px solid var(--line-d); border-radius: 14px; padding: 18px 14px; position: relative; }
+  .chip.ai { border-color: var(--teal); }
+  .chip.human { border-color: var(--amber); }
+  .chip .kind { font: 600 11px var(--mono); letter-spacing: .1em; text-transform: uppercase; color: var(--muted-d); }
+  .chip.ai .kind { color: var(--teal); } .chip.human .kind { color: var(--amber); }
+  .chip h3 { font-size: 18px; margin: 8px 0 6px; }
+  .chip p { font-size: 14px; line-height: 1.45; color: var(--muted-d); }
+  .split { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-top: 28px; }
+  .split div { border-top: 2px solid var(--line-d); padding-top: 16px; }
+  .split b { color: var(--teal); }
+
+  /* proof */
+  .stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 32px; margin-top: 44px; }
+  .stat .num { font: 700 clamp(44px, 5vw, 64px)/1 var(--display); letter-spacing: -.02em; }
+  .stat .num.accent { color: var(--teal-d); }
+  .stat p { margin-top: 10px; color: var(--muted); font-size: 15px; }
+  .fine { margin-top: 28px; font: 500 13px var(--mono); color: var(--muted); }
+
+  /* safety */
+  .grid4 { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; margin-top: 40px; }
+  .grid4 .card { background: var(--ink-2); border: 1px solid var(--line-d); border-radius: 16px; padding: 26px; }
+  .grid4 svg { width: 30px; height: 30px; color: var(--teal); margin-bottom: 14px; }
+  .grid4 h3 { margin-bottom: 8px; }
+  .grid4 p { font-size: 15px; }
+
+  /* audiences */
+  .grid3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; margin-top: 40px; }
+  .grid3 .card { background: var(--card); border: 1px solid var(--line); border-radius: 16px; padding: 28px; display: flex; flex-direction: column; gap: 10px; }
+  .grid3 .tag { font: 600 13px var(--mono); color: var(--teal-d); }
+
+  /* cta */
+  .cta { text-align: center; }
+  .cta h2 { max-width: 760px; margin: 0 auto 18px; }
+  .cta .muted { max-width: 620px; margin: 0 auto 30px; }
+  .cta .ctas { display: flex; justify-content: center; flex-wrap: wrap; gap: 12px; }
+  footer { padding: 32px 0; border-top: 1px solid var(--line-d); font-size: 14px; }
+  footer .wrap { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 12px; }
+  footer a { color: var(--muted-d); }
+
+  .reveal { opacity: 0; transform: translateY(18px); transition: opacity .6s ease, transform .6s ease; }
+  .reveal.in { opacity: 1; transform: none; }
+
+  @media (max-width: 980px) {
+    .hero .wrap { grid-template-columns: 1fr; }
+    .pipeline { grid-template-columns: repeat(2, 1fr); }
+    .story, .grid4, .stats { grid-template-columns: repeat(2, 1fr); }
+    .grid3, .split { grid-template-columns: 1fr; }
+    nav .links { display: none; }
+    nav .btn { margin-left: auto; }
+  }
+  @media (max-width: 560px) {
+    .wrap { padding: 0 16px; }
+    section { padding: 64px 0; }
+    .hero { padding: 56px 0 72px; }
+    .story, .grid4, .stats, .pipeline { grid-template-columns: 1fr; }
+    .steps li { grid-template-columns: 60px 1fr auto; padding: 9px 10px; font-size: 14px; }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    html { scroll-behavior: auto; }
+    .steps li, .dot { animation: none; opacity: 1; }
+    .reveal { opacity: 1; transform: none; transition: none; }
+    .btn { transition: none; }
+  }
+</style>
+</head>
+<body>
+
+<nav aria-label="Main">
+  <div class="wrap">
+    <a class="logo" href="#top">FIX<span>CHAIN</span></a>
+    <div class="links">
+      <a href="#how">How it works</a>
+      <a href="#safety">Safety</a>
+      <a href="#proof">Proof</a>
+      <a href="#who">Who it’s for</a>
+    </div>
+    <a class="btn btn-primary" href="/">Try the live demo</a>
+  </div>
+</nav>
+
+<header class="hero dark" id="top">
+  <div class="wrap">
+    <div>
+      <p class="eyebrow">Autonomous reliability for payment integrations</p>
+      <h1>Payment bugs, <em>fixed and proven</em> before customers notice.</h1>
+      <p class="lead muted">When a merchant’s code mishandles a gateway callback, FIXCHAIN finds the root cause, writes the fix, proves it with an independent test suite and asks a developer to approve it.</p>
+      <div class="ctas">
+        <a class="btn btn-primary" href="/">Try the live demo →</a>
+        <a class="btn btn-ghost" href="https://github.com/Gaganajain/FIXCHAIN">View the code</a>
+      </div>
+      <p class="note">Simulated gateway in the demo · no real money moves</p>
+    </div>
+    <div class="console" role="img" aria-label="Example FIXCHAIN run: seven pipeline steps complete and the independent tests go from 10 of 22 to 22 of 22 passing.">
+      <div class="console-head"><span><span class="dot"></span>Incident #13 · PENDING recorded as FAILED</span><span>run</span></div>
+      <ol class="steps">
+        <li><span class="kind">rules</span><span>Detect mismatch</span><span class="state">done</span></li>
+        <li><span class="kind">rules</span><span>Reproduce in sandbox</span><span class="state">done</span></li>
+        <li class="ai"><span class="kind">AI</span><span>Root cause: map_gateway_status()</span><span class="state">done</span></li>
+        <li class="ai"><span class="kind">AI</span><span>Patch, sandbox only</span><span class="state">done</span></li>
+        <li><span class="kind">rules</span><span>Verify, locked suite</span><span class="state">done</span></li>
+        <li class="human"><span class="kind">human</span><span>Approve with reviewer token</span><span class="state">done</span></li>
+        <li><span class="kind">rules</span><span>Reconcile affected orders</span><span class="state">done</span></li>
+      </ol>
+      <div class="tests"><span>Independent tests</span><span>10/22 → <b>22/22</b></span></div>
+    </div>
+  </div>
+</header>
+
+<section id="problem">
+  <div class="wrap">
+    <p class="eyebrow">The problem</p>
+    <h2 class="reveal">A customer paid. The merchant’s code said “failed”.</h2>
+    <div class="story">
+      <div class="card reveal"><p class="n">01</p><h3>Customer pays</h3><p class="muted">The bank is still confirming, so the gateway reports PENDING.</p></div>
+      <div class="card reveal"><p class="n">02</p><h3>Code misreads it</h3><p class="muted">A small bug in the merchant’s callback handler treats PENDING as FAILED.</p></div>
+      <div class="card reveal"><p class="n">03</p><h3>Money arrives anyway</h3><p class="muted">The bank confirms, but the order is already final, so the update is ignored.</p></div>
+      <div class="card bad reveal"><p class="n">04</p><h3>Refunds and tickets</h3><p class="muted">The customer is charged with no order, and the gateway gets the blame.</p></div>
+    </div>
+    <p class="callout reveal">The gateway did nothing wrong. The bug lives in <b>merchant integration code</b>, written thousands of different ways, and today it’s found by customers and fixed by support tickets.</p>
+  </div>
+</section>
+
+<section class="dark" id="how">
+  <div class="wrap">
+    <p class="eyebrow">How it works</p>
+    <h2 class="reveal">Seven agents, one pipeline, a human signs off.</h2>
+    <div class="pipeline">
+      <div class="chip reveal"><p class="kind">rules</p><h3>Detect</h3><p>Contract check on every gateway callback.</p></div>
+      <div class="chip reveal"><p class="kind">rules</p><h3>Reproduce</h3><p>Replays the incident in an isolated sandbox.</p></div>
+      <div class="chip ai reveal"><p class="kind">AI</p><h3>Investigate</h3><p>Finds the file, function and line, with evidence.</p></div>
+      <div class="chip ai reveal"><p class="kind">AI</p><h3>Patch</h3><p>Writes the smallest fix, in the sandbox only.</p></div>
+      <div class="chip reveal"><p class="kind">rules</p><h3>Verify</h3><p>A locked 22-test suite the AI can’t see.</p></div>
+      <div class="chip human reveal"><p class="kind">human</p><h3>Approve</h3><p>A named reviewer with a token signs off.</p></div>
+      <div class="chip reveal"><p class="kind">rules</p><h3>Reconcile</h3><p>Re-syncs orders from the gateway’s status.</p></div>
+    </div>
+    <div class="split">
+      <div class="reveal"><p class="muted"><b>AI where judgement helps:</b> diagnosing the bug and writing the fix.</p></div>
+      <div class="reveal"><p class="muted"><b>Deterministic rules where money is involved:</b> detecting, verifying and reconciling.</p></div>
+    </div>
+  </div>
+</section>
+
+<section id="proof">
+  <div class="wrap">
+    <p class="eyebrow">Proof it works</p>
+    <h2 class="reveal">Built, deployed and tested, not a mock-up.</h2>
+    <div class="stats">
+      <div class="stat reveal"><p class="num accent">22/22</p><p>independent tests pass on the verified fix, up from 10/22 on the buggy code</p></div>
+      <div class="stat reveal"><p class="num">5/5</p><p>live AI runs ended in a verified fix, with every affected order back in sync</p></div>
+      <div class="stat reveal"><p class="num">~20s</p><p>from injected bug to a verified patch on the deployed app</p></div>
+      <div class="stat reveal"><p class="num">2</p><p>wrong AI patches caught by the verifier and never shipped</p></div>
+    </div>
+    <p class="fine">Measured on our own runs, 19–20 Nov 2026 · 37 automated backend tests</p>
+  </div>
+</section>
+
+<section class="dark" id="safety">
+  <div class="wrap">
+    <p class="eyebrow">Safety</p>
+    <h2 class="reveal">Safe enough for a payments company.</h2>
+    <div class="grid4">
+      <div class="card reveal">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="4" y="11" width="16" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg>
+        <h3>AI never decides a payment</h3><p class="muted">Order states change only through signed gateway callbacks. No money moves.</p>
+      </div>
+      <div class="card reveal">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3l8 3v6c0 5-3.5 8-8 9-4.5-1-8-4-8-9V6l8-3z"/><path d="M8.5 12l2.5 2.5 4.5-5"/></svg>
+        <h3>Independent verifier</h3><p class="muted">A locked test suite the AI can’t read or edit, hash-checked before every run.</p>
+      </div>
+      <div class="card reveal">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="9" cy="8" r="3.5"/><path d="M2.5 20c.8-3.5 3.4-5.5 6.5-5.5s5.7 2 6.5 5.5"/><path d="M16 4.5a3.5 3.5 0 0 1 0 7M21.5 20c-.4-2.2-1.6-3.8-3.2-4.7"/></svg>
+        <h3>Named human approval</h3><p class="muted">Nothing goes live without a reviewer’s name and token, kept in the audit trail.</p>
+      </div>
+      <div class="card reveal">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3l9.5 17h-19L12 3z"/><path d="M12 10v4M12 17.5v.5"/></svg>
+        <h3>Knows what isn’t a bug</h3><p class="muted">Forged or mis-signed callbacks are flagged as external incidents, never “fixed”.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section id="who">
+  <div class="wrap">
+    <p class="eyebrow">Who it’s for</p>
+    <h2 class="reveal">Built for everyone who owns a checkout.</h2>
+    <div class="grid3">
+      <div class="card reveal"><p class="tag">Payment gateways</p><h3>Fewer integration tickets</h3><p class="muted">Offer FIXCHAIN to your merchants as an integration health check, and stop getting blamed for bugs you didn’t write.</p></div>
+      <div class="card reveal"><p class="tag">Merchants</p><h3>Orders that match the money</h3><p class="muted">Catch paid-but-failed orders automatically and get verified fixes your developers review in minutes.</p></div>
+      <div class="card reveal"><p class="tag">Agencies and platforms</p><h3>One view of every checkout</h3><p class="muted">Monitor and fix the payment integrations you maintain for all your clients in one place.</p></div>
+    </div>
+  </div>
+</section>
+
+<section class="dark cta" id="pilot">
+  <div class="wrap">
+    <p class="eyebrow">30-day pilot</p>
+    <h2 class="reveal">Start with one SDK and a few dozen merchants.</h2>
+    <p class="muted reveal">Week one: connect read-only webhook logs. Week two: shadow mode, detect only. Week three: verified fixes go to merchant developers. Week four: measure tickets avoided and time to fix.</p>
+    <div class="ctas reveal">
+      <a class="btn btn-primary" href="https://github.com/Gaganajain/FIXCHAIN/issues/new?title=Pilot%20request">Request a pilot</a>
+      <a class="btn btn-ghost" href="/">See the live demo</a>
+    </div>
+  </div>
+</section>
+
+<footer class="dark">
+  <div class="wrap">
+    <span class="muted">FIXCHAIN · hackathon prototype · the demo uses a simulated gateway, no real money moves</span>
+    <span><a href="https://github.com/Gaganajain/FIXCHAIN">GitHub</a> · <a href="/">Live demo</a></span>
+  </div>
+</footer>
+
+<script>
+  // Fade sections in as they scroll into view. Without JS (or with reduced motion) content is simply visible.
+  (function () {
+    var els = document.querySelectorAll('.reveal');
+    if (!('IntersectionObserver' in window) || matchMedia('(prefers-reduced-motion: reduce)').matches) {
+      els.forEach(function (el) { el.classList.add('in'); });
+      return;
+    }
+    var io = new IntersectionObserver(function (entries) {
+      entries.forEach(function (e) { if (e.isIntersecting) { e.target.classList.add('in'); io.unobserve(e.target); } });
+    }, { rootMargin: '0px 0px -8% 0px' });
+    els.forEach(function (el) { io.observe(el); });
+  })();
+</script>
+<noscript><style>.reveal { opacity: 1; transform: none; }</style></noscript>
+</body>
+</html>
