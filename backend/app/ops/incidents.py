@@ -252,7 +252,9 @@ def task_engineering(task: dict) -> dict:
     sim = bool(inc["simulated"])
     issue = db.one("SELECT * FROM engineering_issues WHERE incident_id=?", (inc["id"],))
     if not issue:
-        ev = [e["summary"] for e in db.rows("SELECT summary FROM evidence WHERE incident_id=? ORDER BY id", (inc["id"],))]
+        ev = [e["summary"] for e in db.rows(  # incident-level findings first, then a few per-ticket samples
+            "SELECT summary FROM evidence WHERE incident_id=? ORDER BY collected_by!='investigation', kind!='fact', id LIMIT 12",
+            (inc["id"],))]
         with core.id_lock:
             eid = core.next_id("engineering_issues", "ENG", 3)
             with db.tx() as c:
@@ -300,12 +302,12 @@ def _eng_case() -> dict | None:
 
 RUN_TO_STATUS = {"QUEUED": "reproducing", "REPRODUCING": "reproducing", "INVESTIGATING": "investigating",
                  "REPAIRING": "patching", "VERIFYING": "testing", "AWAITING_APPROVAL": "awaiting_approval",
-                 "ACTIVE": "fixed", "REJECTED": "patch_rejected", "FAILED": "failed", "NOT_REPRODUCIBLE": "no_defect"}
+                 "ACTIVE": "activated", "REJECTED": "patch_rejected", "FAILED": "failed", "NOT_REPRODUCIBLE": "no_defect"}
 
 
 def _set_issue(issue_id: str, status: str, incident_id: str, sim: bool, outcome: str | None = None, **f) -> None:
     cur = db.one("SELECT status FROM engineering_issues WHERE id=?", (issue_id,))
-    if cur and cur["status"] == status and not f:
+    if cur and cur["status"] == status and not f and not outcome:
         return
     sets = {"status": status, "updated_at": db.now(), **f}
     if outcome:
@@ -333,7 +335,7 @@ def sync_engineering() -> None:
         patch = db.one("SELECT id FROM patches WHERE run_id=? ORDER BY id DESC LIMIT 1", (run["id"],))
         status = RUN_TO_STATUS.get(run["state"], issue["status"])
         _set_issue(issue["id"], status, issue["incident_id"], sim, run_id=run["id"], patch_id=patch["id"] if patch else None)
-        if status == "fixed":
+        if status == "activated":  # approved + activated: verify before calling it fixed
             _post_fix(issue, inc)
 
 

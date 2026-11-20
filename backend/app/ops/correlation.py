@@ -47,9 +47,11 @@ def similarity(t: dict, inc: dict) -> tuple[float, dict]:
     return round(sum(parts.values()), 3), parts
 
 
-def _open_incidents(category: str) -> list[dict]:
+def _open_incidents(category: str, simulated: int) -> list[dict]:
+    # simulated and live data never mix: a live ticket is only ever correlated with live incidents
     rows = db.rows("SELECT * FROM ops_incidents WHERE state NOT IN ('RESOLVED','CLOSED') AND last_seen>=? AND "
-                   "(category=? OR kind='platform') ORDER BY first_seen DESC", (db.now() - WINDOW_S, category))
+                   "(category=? OR kind='platform') AND simulated=? ORDER BY first_seen DESC",
+                   (db.now() - WINDOW_S, category, simulated))
     for r in rows:
         r["symptom_set"] = core.dumps([r["fingerprint"].split(":")[-1]])
     return rows
@@ -121,7 +123,7 @@ def correlate(ticket_id: str) -> dict:
         if t["incident_id"]:
             return {"incident_id": t["incident_id"], "created": False, "score": 1.0, "method": "already-linked"}
         best, best_score, best_parts = None, 0.0, {}
-        for inc in _open_incidents(t["category"]):
+        for inc in _open_incidents(t["category"], t["simulated"]):
             score, parts = similarity(t, inc)
             if score > best_score:
                 best, best_score, best_parts = inc, score, parts
@@ -140,8 +142,9 @@ def correlate(ticket_id: str) -> dict:
                          level="warn", ticket_id=ticket_id, incident_id=best["id"], data=review,
                          simulated=bool(t["simulated"]))
         # burst: enough similar unlinked tickets -> open a parent incident and link them all
-        peers = db.rows("SELECT id FROM tickets WHERE fingerprint=? AND incident_id IS NULL AND created_at>=? AND "
-                        "state NOT IN ('RESOLVED') ORDER BY created_at", (t["fingerprint"], t["created_at"] - BURST_WINDOW_S))
+        # resolved peers are linked too: they are part of the incident's impact even if already fixed
+        peers = db.rows("SELECT id FROM tickets WHERE fingerprint=? AND incident_id IS NULL AND created_at>=? AND simulated=? "
+                        "ORDER BY created_at", (t["fingerprint"], t["created_at"] - BURST_WINDOW_S, t["simulated"]))
         platform = t["category"] == "PLATFORM_OUTAGE"
         high_impact = t["category"] in ("FRAUD_SECURITY", "PRIVACY_COMPLIANCE") and t["severity"] in ("SEV-1", "SEV-2")
         if len(peers) >= BURST_MIN or (platform and len(peers) >= 2):

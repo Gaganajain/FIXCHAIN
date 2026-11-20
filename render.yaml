@@ -38,6 +38,13 @@ services:
         value: "true"
       - key: FIXCHAIN_MAX_REPAIR_ATTEMPTS
         value: "3"
+      # ---- operations platform
+      - key: FIXCHAIN_DEMO_MODE           # true = demo users + demo sign-in (labelled). Set false for real use.
+        value: "true"
+      - key: FIXCHAIN_ADMIN_PASSWORD      # password for the 'admin' user (required when FIXCHAIN_DEMO_MODE=false)
+        sync: false
+      - key: FIXCHAIN_MAX_WORKERS
+        value: "8"
       # Only needed if the dashboard calls this URL directly instead of through the Vercel /api proxy.
       - key: FIXCHAIN_CORS_ORIGINS
         sync: false

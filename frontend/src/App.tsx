@@ -1,121 +1,202 @@
-import { useState } from "react";
-import { Status, reviewerStore, usePoll } from "./api";
-import { Badge } from "./ui";
-import { History } from "./views/History";
-import { Incidents } from "./views/Incidents";
-import { Overview } from "./views/Overview";
-import { Simulator } from "./views/Simulator";
+import {
+  Activity, Bot, BookOpen, FlaskConical, Inbox, LayoutDashboard, LineChart, LogOut, Radar, Settings as SettingsIcon,
+  ShieldCheck, Siren, Smartphone, Wrench, Zap,
+} from "lucide-react";
+import { ReactNode, useEffect, useState, useSyncExternalStore } from "react";
+import { Btn, ErrorNote, Pill, ToastHost, inputCls } from "./components/kit";
+import { Session, session } from "./lib/session";
+import { useV1, v1 } from "./lib/v1";
+import { Agents } from "./pages/Agents";
+import { Analytics } from "./pages/Analytics";
+import { Approvals } from "./pages/Approvals";
+import { CustomerApp } from "./pages/CustomerApp";
+import { Engineering } from "./pages/Engineering";
+import { Incidents } from "./pages/Incidents";
+import { Intelligence } from "./pages/Intelligence";
+import { Knowledge } from "./pages/Knowledge";
+import { MissionControl } from "./pages/MissionControl";
+import { SettingsPage } from "./pages/Settings";
+import { SimulationLab } from "./pages/SimulationLab";
+import { Tickets } from "./pages/Tickets";
 
-type View = "overview" | "incidents" | "simulator" | "history";
-const NAV: { id: View; label: string; hint: string; icon: string }[] = [
-  { id: "overview", label: "Dashboard", hint: "Health & impact", icon: "📊" },
-  { id: "incidents", label: "Incidents", hint: "Detect → repair → verify", icon: "⚑" },
-  { id: "simulator", label: "Simulator", hint: "Checkout & gateway", icon: "₹" },
-  { id: "history", label: "History", hint: "Versions & memory", icon: "⟲" },
+export type Nav = (route: string) => void;
+
+const NAV: { id: string; label: string; icon: ReactNode; perm?: string; staff?: boolean }[] = [
+  { id: "overview", label: "Mission Control", icon: <LayoutDashboard className="h-4 w-4" />, staff: true },
+  { id: "customer", label: "Customer App", icon: <Smartphone className="h-4 w-4" /> },
+  { id: "tickets", label: "Customer Tickets", icon: <Inbox className="h-4 w-4" />, perm: "ticket:read" },
+  { id: "incidents", label: "Operational Incidents", icon: <Siren className="h-4 w-4" />, perm: "incident:read" },
+  { id: "intelligence", label: "Incident Intelligence", icon: <Radar className="h-4 w-4" />, perm: "incident:read" },
+  { id: "agents", label: "Agent Command Center", icon: <Bot className="h-4 w-4" />, perm: "agent:read" },
+  { id: "approvals", label: "Resolution & Approvals", icon: <ShieldCheck className="h-4 w-4" />, perm: "approval:read" },
+  { id: "engineering", label: "Engineering Remediation", icon: <Wrench className="h-4 w-4" />, perm: "engineering:read" },
+  { id: "knowledge", label: "Knowledge & Learning", icon: <BookOpen className="h-4 w-4" />, perm: "knowledge:read" },
+  { id: "simulation", label: "Simulation Lab", icon: <FlaskConical className="h-4 w-4" />, staff: true },
+  { id: "analytics", label: "Historical Analytics", icon: <LineChart className="h-4 w-4" />, perm: "analytics:read" },
+  { id: "settings", label: "Settings & Audit", icon: <SettingsIcon className="h-4 w-4" />, staff: true },
 ];
 
-function ReviewerField({ tokenRequired }: { tokenRequired: boolean }) {
-  const [name, setName] = useState(reviewerStore.get("name"));
-  const [token, setToken] = useState(reviewerStore.get("token"));
-  const cls = "w-40 rounded-xl border bg-panel px-3 py-2 text-sm text-ink placeholder:text-ink-3 focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent";
-  const nameBorder = name ? "border-line" : "border-critical/30";
-  const tokenBorder = token ? "border-line" : "border-critical/30";
+function useRoute(): [string, string | undefined, Nav] {
+  const read = () => window.location.hash.replace(/^#\/?/, "").split("/");
+  const [parts, setParts] = useState(read);
+  useEffect(() => {
+    const f = () => setParts(read());
+    window.addEventListener("hashchange", f);
+    return () => window.removeEventListener("hashchange", f);
+  }, []);
+  const nav: Nav = (r) => { window.location.hash = `/${r}`; };
+  return [parts[0] || "", parts[1] ? decodeURIComponent(parts[1]) : undefined, nav];
+}
+
+function Logo({ small = false }: { small?: boolean }) {
   return (
-    <div className="flex items-center gap-2" title="Recorded on every approve / reject / rollback / reconcile">
-      <label className="text-[12px] font-medium text-ink-2" htmlFor="reviewer-name">Reviewer</label>
-      <input id="reviewer-name" value={name} placeholder="Name" maxLength={60}
-        className={`${cls} ${nameBorder}`}
-        onChange={(e) => { setName(e.target.value); reviewerStore.set("name", e.target.value); }} />
-      {tokenRequired && (
-        <input type="password" value={token} placeholder="Token" aria-label="Reviewer token"
-          className={`${cls} ${tokenBorder}`}
-          onChange={(e) => { setToken(e.target.value); reviewerStore.set("token", e.target.value); }} />
+    <div className="flex items-center gap-2.5">
+      <span className={`grid place-items-center rounded-xl bg-gradient-to-br from-accentDim to-accent font-mono font-bold text-night ${small ? "h-7 w-7 text-[11px]" : "h-9 w-9 text-[13px]"}`}>
+        <Zap className={small ? "h-4 w-4" : "h-5 w-5"} strokeWidth={2.5} />
+      </span>
+      {!small && (
+        <div className="leading-tight">
+          <div className="text-[16px] font-bold tracking-wide text-white">FIXCHAIN</div>
+          <div className="text-[10.5px] text-white/55">Incident intelligence platform</div>
+        </div>
       )}
     </div>
   );
 }
 
-export default function App() {
-  const [view, setView] = useState<View>("overview");
-  const [incident, setIncident] = useState<number | null>(null);
-  const { data: status, error, reload } = usePoll<Status>("/status", 2000);
-  const openIncident = (id: number) => { setIncident(id); setView("incidents"); };
+export function Login({ slot = "ops", compact = false, roles }: { slot?: "ops" | "customer"; compact?: boolean; roles?: string[] }) {
+  const { data: users } = useV1<{ username: string; display_name: string; role: string; locale: string }[]>("/auth/demo-users", 60000, slot);
+  const [username, setUsername] = useState("");
+  const [password, setPassword] = useState("");
+  const [error, setError] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+  const signIn = async (u: string, pw?: string) => {
+    setBusy(true); setError(null);
+    try {
+      const r = await v1<Session>(pw === undefined ? "/auth/demo-login" : "/auth/login", { body: { username: u, password: pw ?? null }, slot });
+      session.set(slot, r);
+    } catch (e) { setError((e as Error).message); } finally { setBusy(false); }
+  };
+  const list = (users ?? []).filter((u) => !roles || roles.includes(u.role));
+  return (
+    <div className={compact ? "" : "w-full max-w-md"}>
+      {!compact && <h1 className="text-[22px] font-bold text-white">Sign in to FIXCHAIN</h1>}
+      {list.length > 0 && (
+        <div className={compact ? "" : "mt-5"}>
+          <div className={`mb-2 flex items-center gap-2 text-[12px] ${compact ? "text-ink-3" : "text-white/60"}`}>
+            <Pill tone="violet">Demo mode</Pill> Pick a role - demo sign-in is not production authentication.
+          </div>
+          <div className="grid gap-2 sm:grid-cols-2">
+            {list.map((u) => (
+              <button key={u.username} disabled={busy} onClick={() => signIn(u.username)}
+                className={`rounded-xl border px-3 py-2.5 text-left transition-colors ${compact ? "border-line bg-panel hover:border-accentDim" : "border-white/10 bg-white/5 hover:border-accentDim hover:bg-white/10"}`}>
+                <div className={`text-[13px] font-semibold ${compact ? "text-ink" : "text-white"}`}>{u.display_name}</div>
+                <div className={`text-[11.5px] ${compact ? "text-ink-3" : "text-white/55"}`}>{u.role.replace("_", " ")} · {u.locale}</div>
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+      {!compact && (
+        <form className="mt-6 space-y-2 border-t border-white/10 pt-5" onSubmit={(e) => { e.preventDefault(); if (username) signIn(username, password); }}>
+          <div className="text-[12px] text-white/60">Password sign-in</div>
+          <input className={inputCls} placeholder="Username" value={username} onChange={(e) => setUsername(e.target.value)} autoComplete="username" />
+          <input className={inputCls} placeholder="Password" type="password" value={password} onChange={(e) => setPassword(e.target.value)} autoComplete="current-password" />
+          <Btn type="submit" variant="primary" busy={busy} disabled={!username || !password}>Sign in</Btn>
+        </form>
+      )}
+      <div className="mt-3"><ErrorNote error={error} /></div>
+    </div>
+  );
+}
 
-  const isActive = (n: { id: View }) => view === n.id;
-
+function Shell({ s }: { s: Session }) {
+  const [route, param, nav] = useRoute();
+  const { data: sys } = useV1<any>("/system", 4000);
+  const { data: apr } = useV1<any[]>(s.user.permissions.includes("approval:read") ? "/approvals?status=pending&limit=1000" : null, 5000);
+  const isStaff = !["customer", "merchant"].includes(s.user.role);
+  const items = NAV.filter((n) => (n.perm ? s.user.permissions.includes(n.perm) : n.staff ? isStaff : true));
+  const current = items.find((n) => n.id === route)?.id ?? items[0].id;
+  const pending = apr?.length ?? 0;
+  const logout = async () => { try { await v1("/auth/logout", { body: {} }); } catch { /* ignore */ } session.set("ops", null); };
+  const page = (() => {
+    switch (current) {
+      case "overview": return <MissionControl nav={nav} />;
+      case "customer": return <CustomerApp />;
+      case "tickets": return <Tickets nav={nav} selected={param} />;
+      case "incidents": return <Incidents nav={nav} selected={param} />;
+      case "intelligence": return <Intelligence nav={nav} />;
+      case "agents": return <Agents nav={nav} />;
+      case "approvals": return <Approvals nav={nav} />;
+      case "engineering": return <Engineering nav={nav} selected={param} />;
+      case "knowledge": return <Knowledge />;
+      case "simulation": return <SimulationLab nav={nav} />;
+      case "analytics": return <Analytics />;
+      default: return <SettingsPage />;
+    }
+  })();
   return (
     <div className="flex min-h-screen bg-bg text-ink">
-      <aside className="hidden w-64 shrink-0 flex-col bg-brand text-white md:flex shadow-sidebar">
-        <div className="px-6 py-6">
-          <div className="flex items-center gap-3">
-            <span className="grid h-10 w-10 place-items-center rounded-2xl bg-accent font-mono text-[16px] font-bold text-brand">FX</span>
-            <div>
-              <div className="text-[18px] font-bold tracking-tight">FIXCHAIN</div>
-              <div className="text-[11px] text-cyan-300/90 uppercase tracking-wider">Payment reliability</div>
-            </div>
-          </div>
-        </div>
-        <nav className="flex-1 space-y-0.5 px-3 pt-2">
-          {NAV.map((n) => (
-            <button key={n.id} onClick={() => setView(n.id)}
-              className={`flex items-center gap-3 rounded-2xl px-4 py-3 text-left transition-all duration-200 ${isActive(n)
-                ? "bg-white text-brand shadow-card border border-brand/10"
-                : "text-cyan-100/90 hover:bg-raised/50"}`}>
-              <span aria-hidden className={`grid h-9 w-9 place-items-center rounded-xl ${isActive(n) ? "bg-brand-2 text-brand" : "bg-white/5"}`}>{n.icon}</span>
-              <div>
-                <div className={`block text-[14px] font-semibold ${isActive(n) ? "text-white" : "text-cyan-100/90"}`}>{n.label}</div>
-                <div className="block text-[10.5px] text-cyan-200/70">{n.hint}</div>
-              </div>
-            </button>
+      <aside className="sticky top-0 hidden h-screen w-64 shrink-0 flex-col bg-night text-white lg:flex">
+        <div className="px-5 py-5"><Logo /></div>
+        <nav className="flex-1 space-y-0.5 overflow-y-auto px-3" aria-label="Main">
+          {items.map((n) => (
+            <a key={n.id} href={`#/${n.id}`} aria-current={current === n.id ? "page" : undefined}
+              className={`group flex items-center gap-3 rounded-xl px-3 py-2 text-[13px] font-medium transition-colors ${current === n.id
+                ? "bg-white/10 text-white shadow-[inset_3px_0_0_#00A8E8]" : "text-white/65 hover:bg-white/5 hover:text-white"}`}>
+              <span className={current === n.id ? "text-accentDim" : "text-white/45 group-hover:text-white/80"}>{n.icon}</span>
+              <span className="flex-1">{n.label}</span>
+              {n.id === "approvals" && pending > 0 && <span className="rounded-full bg-violet-500 px-1.5 text-[10.5px] font-bold">{pending}</span>}
+            </a>
           ))}
         </nav>
-        <div className="m-4 space-y-1.5 rounded-2xl bg-brand/40 p-3 text-[10.5px] text-cyan-200/80 border border-brand/20">
-          <div className="flex items-center gap-1.5">
-            <span className={`text-[10px] ${status?.verifier_suite_intact ? "text-green-400" : "text-red-400"} font-semibold`}>
-              {status?.verifier_suite_intact ? "✓" : "✕"}
-            </span>
-            <span>Verifier suite locked</span>
-          </div>
-          <div className="font-mono text-cyan-200/60">{status?.verifier_suite_sha256.slice(0, 16)}…</div>
-          <div className="flex items-center gap-1.5">
-            <span className="text-[10px] font-semibold">Allowlist:</span>
-            <span className="font-mono">{status?.approved_files.join(", ")}</span>
-          </div>
+        <div className="m-3 rounded-xl border border-white/10 bg-white/[0.03] p-3 text-[11px] text-white/60">
+          <div className="flex items-center gap-1.5"><Activity className="h-3.5 w-3.5 text-accentDim" /> {sys?.workers?.workers ?? "—"} worker(s) · queue {sys?.workers?.queue_depth ?? "—"}</div>
+          <div className="mt-1 text-white/40">In-process worker pool - not cloud autoscaling</div>
         </div>
       </aside>
-
       <div className="flex min-w-0 flex-1 flex-col">
-        <header className="flex flex-wrap items-center gap-2 border-b border-line bg-panel px-5 py-3.5 shadow-card md:px-6">
-          <div className="flex items-center gap-2 md:hidden">
-            <span className="grid h-7 w-7 place-items-center rounded-xl bg-brand font-mono text-[11px] font-bold text-accent">FX</span>
-            <select value={view} onChange={(e) => setView(e.target.value as View)}
-              className="rounded-xl border border-line bg-panel px-3 py-1.5 text-sm font-medium text-brand focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent">
-              {NAV.map((n) => <option key={n.id} value={n.id}>{n.label}</option>)}
-            </select>
-          </div>
-          <h1 className="hidden text-[17px] font-bold text-brand md:block">{NAV.find((n) => n.id === view)?.label}</h1>
+        <header className="sticky top-0 z-30 flex flex-wrap items-center gap-2 border-b border-white/10 bg-night px-4 py-2.5 text-white md:px-6">
+          <div className="lg:hidden"><Logo small /></div>
+          <select aria-label="Navigate" value={current} onChange={(e) => nav(e.target.value)}
+            className="rounded-lg border border-white/15 bg-white/5 px-2 py-1 text-[13px] text-white lg:hidden">
+            {items.map((n) => <option key={n.id} value={n.id} className="text-ink">{n.label}</option>)}
+          </select>
+          <h1 className="hidden text-[15px] font-semibold lg:block">{items.find((n) => n.id === current)?.label}</h1>
           <div className="ml-auto flex flex-wrap items-center gap-2">
-            <ReviewerField tokenRequired={!!status?.reviewer_token_required} />
-            <Badge tone="accent">Simulated · no real money</Badge>
-            {status && (status.agent_mode === "llm"
-              ? <Badge tone="accent">Agents: {status.agent_label}</Badge>
-              : <Badge tone="neutral">Agents: offline</Badge>)}
-            {status?.active_run && (
-              <button onClick={() => openIncident(status.active_run!.incident_id)}>
-                <Badge tone="accent">Run #{status.active_run.id}</Badge>
-              </button>
-            )}
-            {error && <Badge tone="critical">API unreachable — retrying…</Badge>}
+            {sys && <Pill tone={sys.mode === "demo" ? "violet" : "good"}>{sys.mode === "demo" ? "Demo mode · simulated payment environment" : "Production mode"}</Pill>}
+            {sys && <Pill tone="dark">Agents: {sys.llm}</Pill>}
+            <div className="flex items-center gap-2 rounded-xl border border-white/10 bg-white/5 py-1 pl-3 pr-1">
+              <div className="leading-tight">
+                <div className="text-[12.5px] font-semibold">{s.user.display_name}</div>
+                <div className="text-[10.5px] text-white/55">{s.user.role.replace("_", " ")}{s.user.demo ? " · demo" : ""}</div>
+              </div>
+              <button onClick={logout} aria-label="Sign out" title="Sign out" className="rounded-lg p-1.5 text-white/60 hover:bg-white/10 hover:text-white"><LogOut className="h-4 w-4" /></button>
+            </div>
           </div>
         </header>
-
-        <main className="min-w-0 flex-1 p-4 md:p-6">
-          {view === "overview" && <Overview openIncident={openIncident} />}
-          {view === "incidents" && <Incidents selected={incident} select={setIncident} />}
-          {view === "simulator" && <Simulator status={status} refreshStatus={reload} />}
-          {view === "history" && <History />}
-        </main>
+        <main className="min-w-0 flex-1 p-4 md:p-6">{page}</main>
       </div>
     </div>
+  );
+}
+
+export default function App() {
+  const s = useSyncExternalStore(session.subscribe, () => session.get("ops")?.token ?? null);
+  const current = s ? session.get("ops") : null;
+  return (
+    <ToastHost>
+      {current ? <Shell s={current} /> : (
+        <div className="grid min-h-screen place-items-center bg-night px-4 py-10">
+          <div className="w-full max-w-md">
+            <div className="mb-8"><Logo /></div>
+            <Login />
+            <p className="mt-8 text-[11.5px] leading-relaxed text-white/40">
+              Simulated payment environment. Connectors to banks, NPCI, payment and device systems are mocks; no real money moves.
+            </p>
+          </div>
+        </div>
+      )}
+    </ToastHost>
   );
 }
