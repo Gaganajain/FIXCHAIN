@@ -50,7 +50,7 @@ function withContext(rows: Row[], ctx: number) {
 }
 
 function Cell({ side, c }: { side: "l" | "r"; c?: { n: number; text: string; kind: string } }) {
-  const bg = !c ? "bg-raised/40" : c.kind === "del" ? "bg-critical/15" : c.kind === "add" ? "bg-good/15" : "";
+  const bg = !c ? "bg-raised/40" : c.kind === "del" ? "bg-critical/10" : c.kind === "add" ? "bg-good/10" : "";
   const mark = !c ? "" : c.kind === "del" ? "−" : c.kind === "add" ? "+" : " ";
   const markColor = c?.kind === "del" ? "text-critical" : "text-good";
   return (
@@ -67,15 +67,15 @@ export function DiffViewer({ original, patched, file, context = 4 }: {
 }) {
   const rows = withContext(diffRows(original, patched), context);
   return (
-    <div className="overflow-hidden rounded-md border border-line font-mono text-[12px] leading-5">
-      <div className="grid grid-cols-2 border-b border-line bg-raised text-[11px] font-sans font-medium text-ink-2">
-        <div className="border-r border-line px-3 py-1.5">Original · {file} <span className="text-critical">(live, buggy)</span></div>
-        <div className="px-3 py-1.5">Patched · {file} <span className="text-good">(sandbox)</span></div>
+    <div className="overflow-hidden rounded-2xl border border-line font-mono text-sm leading-6">
+      <div className="grid grid-cols-2 border-b border-line bg-raised text-[11px] font-semibold text-ink-2">
+        <div className="border-r border-line px-4 py-2.5">Original · {file} <span className="text-critical">(live, buggy)</span></div>
+        <div className="px-4 py-2.5">Patched · {file} <span className="text-good">(sandbox)</span></div>
       </div>
       <div className="max-h-[420px] overflow-auto">
         {rows.map((r, idx) =>
           "gap" in r ? (
-            <div key={idx} className="border-y border-line bg-raised/60 px-3 py-0.5 text-center text-[11px] text-ink-3">
+            <div key={idx} className="border-y border-line bg-raised/60 px-4 py-1 text-center text-[11px] text-ink-3">
               ⋯ {r.gap} unchanged line{r.gap > 1 ? "s" : ""}
             </div>
           ) : (

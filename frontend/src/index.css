@@ -5,13 +5,78 @@
 :root {
   color-scheme: light;
 }
+
 body {
-  background: #f3f6fa;
-  color: #0b1f3a;
+  background: #F5F7FA;
+  color: #0F172A;
   font-family: Inter, system-ui, sans-serif;
   -webkit-font-smoothing: antialiased;
 }
-::-webkit-scrollbar { width: 8px; height: 8px; }
-::-webkit-scrollbar-thumb { background: #cbd6e3; border-radius: 4px; }
-::-webkit-scrollbar-track { background: transparent; }
-:focus-visible { outline: 2px solid #00a8e8; outline-offset: 2px; }
+
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+::-webkit-scrollbar-thumb {
+  background: #CBD5E1;
+  border-radius: 4px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+:focus-visible {
+  outline: 2px solid #00F0FF;
+  outline-offset: 2px;
+}
+
+/* Paytm Business style utilities */
+.sidebar-link {
+  @apply flex items-center gap-3 rounded-2xl px-4 py-3 text-left transition-all duration-200;
+}
+.sidebar-link.active {
+  @apply bg-white text-brand shadow-card border border-brand/10;
+}
+.sidebar-link.inactive {
+  @apply text-ink-2 hover:bg-raised/50 hover:text-brand;
+}
+
+.kpi-card {
+  @apply rounded-3xl border border-line bg-panel p-5 shadow-card transition-all duration-200 hover:shadow-cardHover;
+}
+
+.btn-paytm {
+  @apply inline-flex items-center justify-center gap-2 rounded-xl border px-5 py-2.5 text-sm font-semibold transition-all duration-200;
+}
+.btn-primary {
+  @apply border-brand bg-brand text-white hover:bg-brand-2 hover:shadow-lg hover:shadow-brand/20;
+}
+.btn-ghost {
+  @apply border-transparent bg-transparent text-ink-2 hover:bg-raised hover:text-brand;
+}
+.btn-good {
+  @apply border-good bg-good text-white hover:bg-green-600;
+}
+.btn-danger {
+  @apply border-critical/30 bg-transparent text-critical hover:bg-critical/10;
+}
+
+.input-paytm {
+  @apply rounded-xl border border-line bg-panel px-4 py-2.5 text-sm text-ink placeholder:text-ink-3 focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent;
+}
+
+.badge-paytm {
+  @apply inline-flex items-center gap-1.5 whitespace-nowrap rounded-full border px-3 py-1 text-[11px] font-semibold;
+}
+
+.nav-pill {
+  @apply rounded-xl border border-brand/20 bg-white px-3 py-1.5 text-sm font-medium text-brand transition-all hover:bg-brand/5;
+}
+
+.table-header-cell {
+  @apply border-b border-line bg-panel px-4 py-3 text-left text-[11px] font-semibold uppercase tracking-wider text-ink-3;
+}
+
+.table-row {
+  @apply border-b border-line/60 hover:bg-raised/50 transition-colors;
+}
