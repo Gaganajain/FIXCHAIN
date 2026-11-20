@@ -32,7 +32,8 @@ def resolve(ticket_id: str, summary: str, verification: str, actor: str = "verif
 
 
 def escalate(t: dict, reason: str, tell: bool = True) -> None:
-    tickets.update(t["id"], extracted={**t["extracted"], "escalation_reason": reason})
+    cur = tickets.get(t["id"])  # re-read: never overwrite fields another step wrote in the meantime
+    tickets.merge_extracted(t["id"], escalation_reason=reason)
     tickets.safe_transition(t["id"], "ESCALATED", reason, "resolution")
     if tell:
         tickets.tell(t, "escalated")
@@ -133,7 +134,7 @@ def task_correlate(task: dict) -> dict:
         else:
             tickets.tell(t, key, incident=inc["id"])
     if r.get("review"):
-        tickets.update(t["id"], extracted={**t["extracted"], "correlation_review": r["review"]})
+        tickets.merge_extracted(t["id"], correlation_review=r["review"])
     t = tickets.get(t["id"])
     if t["extracted"].get("triage", {}).get("human_review_required") and t["category"] != "FRAUD_SECURITY":
         escalate(t, "Low confidence or human-only category - routed to support with a copilot brief")
@@ -152,7 +153,7 @@ def task_resolve(task: dict) -> dict:
     t = tickets.get(task["subject_id"])
     if t["state"] in ("RESOLVED", "ESCALATED", "APPROVAL_REQUIRED", "WAITING_PARTNER"):
         return {"skipped": t["state"]}
-    if t["missing_fields"]:
+    if t["missing_fields"] and t["category"] != "FRAUD_SECURITY":  # fraud is routed to humans at once; details can follow
         tickets.safe_transition(t["id"], "NEEDS_CUSTOMER", f"waiting for {', '.join(t['missing_fields'])}", "resolution")
         return {"waiting_for": t["missing_fields"]}
     tickets.safe_transition(t["id"], "INVESTIGATING", "running approved playbook", "resolution")
@@ -253,12 +254,13 @@ def _pb_soundbox(t: dict, pb: dict, attempt: int) -> str:
         return "low_battery"
     if tel.get("payment_announcements_missing"):
         tickets.tell(t, "soundbox_online_defect")
-        tickets.update(t["id"], extracted={**t["extracted"], "awaiting_engineering": True})
+        tickets.merge_extracted(t["id"], awaiting_engineering=True)
         evidence("observation", "Device healthy; announcements are triggered when the order reaches PAID - points to "
                  "the payment-status path, not hardware", "resolution", "resolution", ticket_id=t["id"],
                  incident_id=t["incident_id"])
-        if not t["incident_id"]:
-            escalate(t, "Device healthy but announcements missing - needs engineering review", tell=False)
+        core.publish("ticket.awaiting_engineering", f"{t['id']}: device healthy, payment-status path suspected - waiting "
+                     f"for incident/engineering", actor="resolution", actor_type="agent", ticket_id=t["id"],
+                     incident_id=t["incident_id"], simulated=_sim(t))
         return "awaiting_engineering"
     tickets.tell(t, "soundbox_ok")
     tickets.safe_transition(t["id"], "NEEDS_CUSTOMER", "device healthy - asking merchant to confirm", "resolution")
@@ -282,7 +284,7 @@ def _pb_qr(t: dict, pb: dict, attempt: int) -> str:
                  "QR mapped to a deactivated VPA after a config push",
                  summary=f"Re-link QR {qr} to its active VPA", evidence_summary=f"Mapped VPA inactive since push "
                  f"{q.get('config_push')}", expected_effect="QR accepts payments again (reversible)")
-        tickets.update(t["id"], extracted={**t["extracted"], "action_key": key})
+        tickets.merge_extracted(t["id"], action_key=key)
         tickets.safe_transition(t["id"], "APPROVAL_REQUIRED", "QR re-link needs approval", "resolution")
         return "approval_required"
     if not q.get("found"):
@@ -314,7 +316,7 @@ def _pb_settlement(t: dict, pb: dict, attempt: int) -> str:
                  summary=f"Escalate settlement batch {s['batch_id']} to {s.get('partner')}",
                  evidence_summary=f"Batch held at partner since {s.get('held_since', 'today')}",
                  expected_effect="Partner releases the batch; FIXCHAIN moves no money")
-        tickets.update(t["id"], extracted={**t["extracted"], "action_key": key, "batch_id": s["batch_id"]})
+        tickets.merge_extracted(t["id"], action_key=key, batch_id=s["batch_id"])
         tickets.safe_transition(t["id"], "APPROVAL_REQUIRED", "partner escalation needs approval", "resolution")
         return "approval_required"
     if not s.get("found"):
@@ -326,7 +328,7 @@ def _pb_settlement(t: dict, pb: dict, attempt: int) -> str:
 
 def _pb_platform(t: dict, pb: dict, attempt: int) -> str:
     if t["incident_id"]:
-        tickets.update(t["id"], extracted={**t["extracted"], "awaiting_incident": True})
+        tickets.merge_extracted(t["id"], awaiting_incident=True)
         return "awaiting_incident_mitigation"
     a = _propose(t, pb, "gateway_health_check", {}, f"gw_check:{t['id']}:{attempt}", "Read gateway health")
     h = a["result"]
@@ -386,7 +388,7 @@ def _on_action(a: dict) -> None:
         elif status in ("rejected", "blocked", "cancelled"):
             escalate(t, f"{t_type} {status} by human/policy")
         elif status == "human_led":
-            tickets.update(t["id"], extracted={**t["extracted"], "owner": "human (Tier 3)"})
+            tickets.merge_extracted(t["id"], owner="human (Tier 3)")
 
 
 @workers.on_dead_letter
@@ -424,7 +426,8 @@ def customer_reply(ticket_id: str, text: str, author: str) -> dict:
             facts[k] = v
     missing = understanding.missing_fields(t["category"], facts)
     tickets.update(ticket_id, amount=facts.get("amount_paise") or t["amount"], txn_ref=facts.get("txn_ref") or t["txn_ref"],
-                   missing_fields=missing, extracted={**t["extracted"], "facts": facts})
+                   missing_fields=missing)
+    tickets.merge_extracted(ticket_id, facts=facts)
     t = tickets.get(ticket_id)
     if missing:
         tickets.tell(t, f"ask_{missing[0]}", kind="question")

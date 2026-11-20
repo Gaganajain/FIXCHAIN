@@ -99,7 +99,7 @@ function AgentBoard({ run }: { run: Run }) {
   );
 }
 
-function Timeline({ run }: { run: Run }) {
+export function Timeline({ run }: { run: Run }) {
   return (
     <ol className="max-h-[460px] space-y-0 overflow-auto pr-1">
       {run.steps.map((s) => (
@@ -127,7 +127,7 @@ function Timeline({ run }: { run: Run }) {
   );
 }
 
-function TestMatrix({ baseline, patched }: { baseline?: TestRun; patched?: TestRun }) {
+export function TestMatrix({ baseline, patched }: { baseline?: TestRun; patched?: TestRun }) {
   const names = Array.from(new Set([...(baseline?.results ?? []), ...(patched?.results ?? [])].map((r) => r.name)));
   const cell = (t: TestRun | undefined, n: string) => {
     const r = t?.results.find((x) => x.name === n);
@@ -164,7 +164,7 @@ function TestMatrix({ baseline, patched }: { baseline?: TestRun; patched?: TestR
   );
 }
 
-function Repro({ run }: { run: Run }) {
+export function Repro({ run }: { run: Run }) {
   const before = run.steps.find((s) => s.data?.reproduction)?.data.reproduction;
   const after = run.steps.find((s) => s.data?.reproduction_after)?.data.reproduction_after;
   if (!before) return null;

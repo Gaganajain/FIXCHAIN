@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
+import { session } from "./lib/session";
 
 export type Status = {
   environment: string;
@@ -101,11 +102,15 @@ export const reviewerStore = {
 };
 
 export async function api<T = any>(path: string, body?: unknown): Promise<T> {
+  const token = session.token("ops");
+  const auth: Record<string, string> = token ? { Authorization: `Bearer ${token}` } : {};
   const res = await fetch(`/api${path}`, {
     method: body === undefined ? "GET" : "POST",
-    headers: body === undefined ? undefined : {
+    headers: body === undefined ? auth : {
+      ...auth,
       "Content-Type": "application/json",
-      "X-Reviewer": reviewerStore.get("name"),
+      // The signed-in user is the reviewer of record; the manual name field remains as a fallback.
+      "X-Reviewer": session.user("ops")?.display_name || reviewerStore.get("name"),
       "X-Reviewer-Token": reviewerStore.get("token"),
     },
     body: body === undefined ? undefined : JSON.stringify(body),

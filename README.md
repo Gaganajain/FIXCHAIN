@@ -49,6 +49,33 @@ flowchart LR
 
 **AI where judgement helps** (diagnosing and writing the fix). **Deterministic rules wherever money is involved** (detecting, verifying, reconciling). Nothing goes live without a person’s approval.
 
+## Operations platform: from customer complaint to verified fix
+
+The engineering pipeline above now sits inside a full incident-operations platform (`backend/app/ops/`):
+
+```
+Customer complaint (English / Hindi / Marathi; text, voice, photo)
+  → Customer Understanding → ticket persisted → Triage (rule-based severity, SLA)
+  → Incident Intelligence (clustering, spike detection) → one parent incident for many tickets
+  → Investigation (facts kept separate from hypotheses) → Resolution (versioned playbooks)
+  → policy tiers: autonomous read-only/low-risk · human approval · human-led (fraud, freezes, filings)
+  → execution → verification → customer update in their language
+  → Engineering Remediation (this pipeline: reproduce · patch · locked tests · approval · post-fix replay)
+  → Learning (verified outcomes → proposals a human approves) → Mission Control (live event stream)
+```
+
+- **The model never grants itself permission.** Every action has a tier; consequential ones need an approval
+  bound to a SHA-256 of the exact action, with role checks and expiry. Unknown actions are denied.
+- **Evidence before claims.** A ticket closes only with a named verification source; "accepted" is not "completed".
+- **Simulation Lab:** five seeded, repeatable scenarios (UPI failure, Soundbox, QR, settlement, platform outage) at
+  50 / 100 / 300 tickets, clearly labelled and never mixed with live data. All banks, NPCI, payment and device
+  systems are mock connectors.
+- **Mission Control:** customer device, agent control room and incident board side by side, driven only by
+  persisted backend events.
+
+Docs: [architecture](docs/ARCHITECTURE.md) · [agents](docs/AGENTS.md) · [data model](docs/DATA_MODEL.md) ·
+[API](docs/API.md) · [deployment & troubleshooting](docs/DEPLOYMENT.md) · [demo script](docs/DEMO.md)
+
 ## Proof it works
 
 Measured on our own runs (19–20 Nov 2026), not projected:
@@ -59,7 +86,7 @@ Measured on our own runs (19–20 Nov 2026), not projected:
 | **5/5** | live AI runs ended in a verified fix, with every affected order back in sync |
 | **~20 s** | from an injected bug to a verified patch on the deployed app |
 | **2** | wrong AI patches caught by the verifier (11/22 and 15/22 tests) and never shipped |
-| **37** | automated backend tests |
+| **66 + 8** | automated backend tests (37 engineering + 29 operations platform) and frontend unit tests |
 
 ## Why it’s safe to roll out
 
@@ -73,12 +100,13 @@ Measured on our own runs (19–20 Nov 2026), not projected:
 
 ## Try it in 2 minutes
 
-1. Open the [live demo](https://fixchain.vercel.app) and enter a reviewer name in the top bar. *(The free backend may take up to a minute to wake.)*
-2. **Simulator** → *Inject PENDING→FAILED bug* → click **PENDING**. The order is wrongly marked `PAYMENT_FAILED`.
-3. **Incidents** → watch the agents work: root cause with evidence, the code diff, tests going from 10/22 to 22/22.
-4. **Approve & activate** (requires the reviewer token on the hosted demo), then **Reconcile** the affected orders.
-5. **Overview** → integration health back to 100%.
-6. Bonus: *Send forged callback* three times → an external incident appears, and no patch is attempted.
+1. Open the [live demo](https://fixchain.vercel.app) and pick a role. Demo sign-in is labelled and is not production authentication. *(The free backend may take up to a minute to wake.)*
+2. **Simulation Lab** → scenario **B: Soundbox failure**, 300 tickets → **Start**. Watch tickets in three languages cluster into one incident while the worker pool scales.
+3. **Operational Incidents** → the copilot brief: facts, hypotheses and why the severity was chosen.
+4. **Engineering Remediation** → the defect was reproduced, patched and passed 22/22 locked tests. Approve it as the approver; the root cause becomes *confirmed* and the waiting tickets close.
+5. **Customer App** → chat as a merchant in Hindi or a customer in Marathi.
+
+Full walkthrough: [docs/DEMO.md](docs/DEMO.md). The original engineering console is still available under **Engineering Remediation → Classic pipeline console**.
 
 ## Tech stack
 
@@ -154,8 +182,9 @@ With no key, the agents run in a clearly labelled *offline* mode (AST analysis p
 
 ```bash
 cd backend
-.venv/Scripts/python -m pytest -q                                              # 37 backend tests, offline and isolated
+.venv/Scripts/python -m pytest -q                                              # 66 backend tests, offline and isolated
 FIXCHAIN_TARGET_DIR=merchant_templates .venv/Scripts/python -m pytest verifier_suite -q   # verifier vs the clean handler
+cd ../frontend && npm test && npm run build                                      # unit tests, type-check, production build
 ```
 
 ## Deploy

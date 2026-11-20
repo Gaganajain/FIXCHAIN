@@ -101,9 +101,9 @@ def severity(category: str, symptoms: list[str], amount_paise: int | None = None
         score += 1
         factors["high_amount"] = 1
         reasons.append("HIGH_AMOUNT")
-    if cohort >= 200:
-        score += 3
-        factors["cohort"] = 3
+    if cohort >= 200:  # a major merchant / customer cohort is SEV-1 territory on its own
+        score += 4
+        factors["cohort"] = 4
         reasons.append("MAJOR_COHORT")
     elif cohort >= 50:
         score += 2

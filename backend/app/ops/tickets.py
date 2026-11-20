@@ -55,6 +55,15 @@ def update(ticket_id: str, **fields) -> None:
         c.execute(f"UPDATE tickets SET {sets} WHERE id=?", (*fields.values(), ticket_id))
 
 
+def merge_extracted(ticket_id: str, **kv) -> None:
+    """Atomic per-key merge into tickets.extracted (json_set), so concurrent writers never overwrite each other."""
+    import json as _json
+    with db.tx() as c:
+        for k, v in kv.items():
+            c.execute("UPDATE tickets SET extracted=json_set(COALESCE(extracted,'{}'), ?, json(?)), updated_at=? WHERE id=?",
+                      (f"$.{k}", _json.dumps(v, default=str), db.now(), ticket_id))
+
+
 def transition(ticket_id: str, to: str, reason: str, actor: str = "orchestrator", force: bool = False) -> bool:
     t = db.one("SELECT state, simulated, incident_id FROM tickets WHERE id=?", (ticket_id,))
     if not t:

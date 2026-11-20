@@ -405,7 +405,15 @@ def _event_rows(after: int, limit: int, ticket_id: str | None, incident_id: str 
 
 @router.get("/events")
 def events(user: User = Depends(auth.current_user), after: int = 0, ticket_id: str | None = None,
-           incident_id: str | None = None, limit: int = Query(200, le=1000), tail: bool = False):
+           incident_id: str | None = None, limit: int = Query(200, le=1000), tail: bool = False,
+           important: bool = False):
+    if important and user.can("ticket:read"):
+        rows = db.rows("SELECT * FROM ops_events WHERE level IN ('warn','error') OR type IN ('incident.created',"
+                       "'incident.severity_changed','engineering.issue_created','incident.root_cause_confirmed',"
+                       "'workers.scaled') ORDER BY id DESC LIMIT ?", (limit,))
+        for r in rows:
+            r["data"] = core.loads(r["data"])
+        return rows
     if tail and not after:
         last = db.one("SELECT MAX(id) AS m FROM ops_events")["m"] or 0
         after = max(0, last - limit)

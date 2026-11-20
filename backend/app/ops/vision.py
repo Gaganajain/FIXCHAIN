@@ -39,7 +39,8 @@ def _open(data: bytes):
 def heuristic(data: bytes) -> dict:
     img = _open(data)
     counts = {"green": 0, "amber": 0, "red": 0}
-    px = list(img.getdata())
+    raw = img.tobytes()  # RGB triplets
+    px = [(raw[i], raw[i + 1], raw[i + 2]) for i in range(0, len(raw), 3)]
     for r, g, b in px:
         h, s, v = colorsys.rgb_to_hsv(r / 255, g / 255, b / 255)
         if s < 0.55 or v < 0.6:
