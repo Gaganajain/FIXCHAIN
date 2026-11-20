@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>FIXCHAIN · Payment integration bugs, fixed and verified</title>
 <meta name="theme-color" content="#002E6E">
-<meta name="description" content="FIXCHAIN detects, diagnoses, patches and verifies merchant-side payment integration bugs, with an independent test suite and human approval.">
+<meta name="description" content="FIXCHAIN turns hundreds of payment complaints into one incident, finds the bug in the merchant's code, fixes it, proves it with a locked test suite and asks a person to approve. Built for Paytm merchants.">
 <meta property="og:title" content="FIXCHAIN: the autonomous reliability engineer for payment integrations">
 <meta property="og:description" content="Detects, diagnoses, patches and verifies merchant-side payment bugs before a paid order turns into a refund.">
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -132,6 +132,28 @@
   .grid3 .card { background: var(--card); border: 1px solid var(--line); border-radius: 20px; padding: 28px; display: flex; flex-direction: column; gap: 10px; box-shadow: 0 6px 20px rgba(0,46,110,.05); }
   .grid3 .tag { font: 600 13px var(--mono); color: var(--teal-d); }
 
+  /* quotes, tiers, pilot weeks */
+  .two { display: grid; grid-template-columns: 1fr 1fr; gap: 40px; margin-top: 40px; align-items: start; }
+  .quote { background: var(--card); border: 1px solid var(--line); border-radius: 16px; padding: 16px 20px; margin-bottom: 12px; }
+  .quote .lang { font: 600 12px var(--mono); color: var(--muted); margin-bottom: 4px; }
+  .quote p:last-child { font-size: 17px; }
+  .mini { display: grid; grid-template-columns: 1fr 1fr; gap: 20px 28px; }
+  .mini .num { font: 700 44px/1 var(--display); letter-spacing: -.02em; }
+  .mini .num.accent { color: var(--teal-d); }
+  .mini p { margin-top: 6px; color: var(--muted); font-size: 15px; }
+  .mini .fine { grid-column: 1 / -1; margin-top: 4px; }
+  .tiers { margin-top: 32px; display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; }
+  .tiers div { border-top: 3px solid var(--teal); padding-top: 14px; }
+  .tiers div.t2 { border-color: var(--amber); } .tiers div.t3 { border-color: #FF7A7A; }
+  .tiers b { display: block; font-family: var(--display); font-size: 18px; margin-bottom: 4px; }
+  .weeks { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; margin: 36px 0 28px; text-align: left; }
+  .weeks div { background: var(--ink-2); border: 1px solid var(--line-d); border-radius: 18px; padding: 20px; }
+  .weeks .wk { font: 600 12px var(--mono); color: var(--teal); }
+  .weeks h3 { font-size: 20px; margin: 6px 0 8px; }
+  .weeks p { font-size: 15px; color: var(--muted-d); }
+  .grid3 .when { font: 600 13px var(--mono); color: var(--muted); }
+  .subhead { margin-top: 56px; font-size: 28px; }
+
   /* cta */
   .cta { text-align: center; }
   .cta h2 { max-width: 760px; margin: 0 auto 18px; }
@@ -148,7 +170,8 @@
     .hero .wrap { grid-template-columns: 1fr; }
     .pipeline { grid-template-columns: repeat(2, 1fr); }
     .story, .grid4, .stats { grid-template-columns: repeat(2, 1fr); }
-    .grid3, .split { grid-template-columns: 1fr; }
+    .grid3, .split, .two, .tiers { grid-template-columns: 1fr; }
+    .weeks { grid-template-columns: repeat(2, 1fr); }
     nav .links { display: none; }
     nav .btn { margin-left: auto; }
   }
@@ -156,7 +179,7 @@
     .wrap { padding: 0 16px; }
     section { padding: 64px 0; }
     .hero { padding: 56px 0 72px; }
-    .story, .grid4, .stats, .pipeline { grid-template-columns: 1fr; }
+    .story, .grid4, .stats, .pipeline, .weeks, .mini { grid-template-columns: 1fr; }
     .steps li { grid-template-columns: 60px 1fr auto; padding: 9px 10px; font-size: 14px; }
   }
   @media (prefers-reduced-motion: reduce) {
@@ -173,10 +196,12 @@
   <div class="wrap">
     <a class="logo" href="#top">FIX<span>CHAIN</span></a>
     <div class="links">
+      <a href="#complaints">Complaints</a>
       <a href="#how">How it works</a>
-      <a href="#safety">Safety</a>
       <a href="#proof">Proof</a>
-      <a href="#who">Who it’s for</a>
+      <a href="#safety">Safety</a>
+      <a href="#pilot">Paytm pilot</a>
+      <a href="#pricing">Pricing</a>
     </div>
     <a class="btn btn-primary" href="/" data-demo>Try the live demo</a>
   </div>
@@ -187,7 +212,7 @@
     <div>
       <p class="eyebrow">Built for Paytm merchants · autonomous payment reliability</p>
       <h1>Payment bugs, <em>fixed and proven</em> before customers notice.</h1>
-      <p class="lead muted">When a merchant’s code mishandles a gateway callback, FIXCHAIN finds the root cause, writes the fix, proves it with an independent test suite and asks a developer to approve it.</p>
+      <p class="lead muted">From the customer’s first complaint, in English, Hindi or Marathi, to a verified code fix. FIXCHAIN groups duplicate tickets into one incident, finds the bug in the merchant’s code, writes the fix, proves it with a locked test suite and asks a person to approve it.</p>
       <div class="ctas">
         <a class="btn btn-primary" href="/" data-demo>Try the live demo →</a>
         <a class="btn btn-ghost" href="https://github.com/Gaganajain/FIXCHAIN">View the code</a>
@@ -224,6 +249,28 @@
   </div>
 </section>
 
+<section id="complaints">
+  <div class="wrap">
+    <p class="eyebrow">The real problem</p>
+    <h2 class="reveal">One bug becomes hundreds of complaints.</h2>
+    <p class="callout muted reveal">Support investigates the same failure again and again, in three languages, and engineering hears about it last. FIXCHAIN turns them into one incident, one investigation, and an update for every customer in their own language.</p>
+    <div class="two">
+      <div class="reveal">
+        <div class="quote"><p class="lang">English</p><p>₹150 debited, but the machine says payment failed.</p></div>
+        <div class="quote"><p class="lang">Hindi</p><p lang="hi">मेरे खाते से ₹150 कट गए, पर मशीन ने पेमेंट फेल दिखाया।</p></div>
+        <div class="quote"><p class="lang">Marathi</p><p lang="mr">माझ्या खात्यातून ₹150 कापले, पण मशीनवर पेमेंट अयशस्वी दाखवले.</p></div>
+      </div>
+      <div class="mini reveal">
+        <div><p class="num accent">300 → 1</p><p>tickets grouped into one incident</p></div>
+        <div><p class="num">164</p><p>tickets resolved and verified</p></div>
+        <div><p class="num">26</p><p>actions waiting for a person’s approval</p></div>
+        <div><p class="num">0</p><p>money actions without approval</p></div>
+        <p class="fine">From our Simulation Lab run: scenario B (Soundbox failure), 300 tickets</p>
+      </div>
+    </div>
+  </div>
+</section>
+
 <section class="dark" id="how">
   <div class="wrap">
     <p class="eyebrow">How it works</p>
@@ -254,7 +301,7 @@
       <div class="stat reveal"><p class="num">~20s</p><p>from injected bug to a verified patch on the deployed app</p></div>
       <div class="stat reveal"><p class="num">2</p><p>wrong AI patches caught by the verifier and never shipped</p></div>
     </div>
-    <p class="fine">Measured on our own runs, 19–20 Nov 2026 · 37 automated backend tests</p>
+    <p class="fine">Measured on our own runs, 19–20 Nov 2026 · 66 backend and 8 frontend automated tests, all passing</p>
   </div>
 </section>
 
@@ -280,6 +327,11 @@
         <h3>Knows what isn’t a bug</h3><p class="muted">Forged or mis-signed callbacks are flagged as external incidents, never “fixed”.</p>
       </div>
     </div>
+    <div class="tiers reveal">
+      <div><b>Runs on its own</b><p class="muted">Status checks, Soundbox restarts, customer updates. Logged and verified before anything closes.</p></div>
+      <div class="t2"><b>Needs a person’s approval</b><p class="muted">Reconciliation, refund requests, QR re-link, code patches. Approval is tied to the exact action.</p></div>
+      <div class="t3"><b>Led by a person</b><p class="muted">Fraud, account freezes, regulatory filings. FIXCHAIN only gathers evidence and routes.</p></div>
+    </div>
   </div>
 </section>
 
@@ -288,29 +340,55 @@
     <p class="eyebrow">Who it’s for</p>
     <h2 class="reveal">Built for everyone who owns a checkout.</h2>
     <div class="grid3">
-      <div class="card reveal"><p class="tag">Payment gateways</p><h3>Fewer integration tickets</h3><p class="muted">Offer FIXCHAIN to your merchants as an integration health check, and stop getting blamed for bugs you didn’t write.</p></div>
-      <div class="card reveal"><p class="tag">Merchants</p><h3>Orders that match the money</h3><p class="muted">Catch paid-but-failed orders automatically and get verified fixes your developers review in minutes.</p></div>
-      <div class="card reveal"><p class="tag">Agencies and platforms</p><h3>One view of every checkout</h3><p class="muted">Monitor and fix the payment integrations you maintain for all your clients in one place.</p></div>
+      <div class="card reveal"><p class="tag">Payment gateways and PSPs</p><h3>Fewer integration tickets</h3><p class="muted">Offer FIXCHAIN to your merchants as an integration health check, and stop getting blamed for bugs you didn’t write.</p></div>
+      <div class="card reveal"><p class="tag">Merchants and e-commerce platforms</p><h3>Orders that match the money</h3><p class="muted">Catch paid-but-failed orders automatically and get verified fixes your developers review in minutes.</p></div>
+      <div class="card reveal"><p class="tag">Banks and agencies</p><h3>One incident per cause</h3><p class="muted">Banks get grouped incidents, human-led sensitive actions and a full audit trail. Agencies reuse verified repairs across every client integration they maintain.</p></div>
     </div>
   </div>
 </section>
 
 <section class="dark cta" id="pilot">
   <div class="wrap">
-    <p class="eyebrow">30-day pilot</p>
-    <h2 class="reveal">Start with one SDK and a few dozen merchants.</h2>
-    <p class="muted reveal">Week one: connect read-only webhook logs. Week two: shadow mode, detect only. Week three: verified fixes go to merchant developers. Week four: measure tickets avoided and time to fix.</p>
-    <div class="ctas reveal">
+    <p class="eyebrow">Paytm as first customer</p>
+    <h2 class="reveal">A 30-day pilot that earns its autonomy.</h2>
+    <p class="muted reveal">Paytm runs the Soundbox devices, the QR network and the support desk: every part of the loop FIXCHAIN closes. We start with one merchant cohort, Soundbox and QR tickets, read-only.</p>
+    <div class="weeks reveal">
+      <div><p class="wk">Week 1</p><h3>Connect</h3><p>Sandbox data and read-only access to ticket and device feeds. Agree the success metrics.</p></div>
+      <div><p class="wk">Week 2</p><h3>Shadow</h3><p>FIXCHAIN triages and groups live tickets in parallel. Agents work as usual; we compare.</p></div>
+      <div><p class="wk">Week 3</p><h3>Assist</h3><p>Agents get drafts in the merchant’s language. Safe device checks run for a small cohort.</p></div>
+      <div><p class="wk">Week 4</p><h3>Decide</h3><p>Results against the metrics. Go or no-go on wider rollout and approval-gated actions.</p></div>
+    </div>
+    <p class="muted reveal">Success criteria: grouping accuracy, time saved per ticket, verified fixes without an agent, and zero unauthorized actions. No money moves, and nothing reaches customers without Paytm’s approval.</p>
+    <div class="ctas reveal" style="margin-top:28px">
       <a class="btn btn-primary" href="https://github.com/Gaganajain/FIXCHAIN/issues/new?title=Pilot%20request">Request a pilot</a>
       <a class="btn btn-ghost" href="/" data-demo>See the live demo</a>
     </div>
   </div>
 </section>
 
+<section id="pricing">
+  <div class="wrap">
+    <p class="eyebrow">Go-to-market and pricing</p>
+    <h2 class="reveal">Land with Paytm, then expand across payments.</h2>
+    <div class="grid3">
+      <div class="card reveal"><p class="when">Months 0–3</p><h3>Land</h3><p class="muted">Paytm pilot, then a paid deployment for Soundbox and QR support, giving a measured case study.</p></div>
+      <div class="card reveal"><p class="when">Months 3–12</p><h3>Expand</h3><p class="muted">Payment gateways and PSPs, through the ticketing and monitoring tools their teams already use.</p></div>
+      <div class="card reveal"><p class="when">Month 12 onward</p><h3>Scale</h3><p class="muted">Self-serve code repair for merchants and agencies: connect a repo, get verified fixes.</p></div>
+    </div>
+    <h3 class="subhead reveal">Priced on verified outcomes, not seats.</h3>
+    <div class="grid3">
+      <div class="card reveal"><p class="tag">Platform</p><h3>Annual subscription</h3><p class="muted">Per deployment, tiered by monthly ticket volume. Triage, grouping, Mission Control and the audit trail.</p></div>
+      <div class="card reveal"><p class="tag">Outcomes</p><h3>Usage fee</h3><p class="muted">Per verified resolution and per verified code fix. No verification, no charge.</p></div>
+      <div class="card reveal"><p class="tag">Enterprise</p><h3>Private deployment</h3><p class="muted">Custom connectors, data residency and compliance support for banks and large PSPs.</p></div>
+    </div>
+    <p class="fine">A plan, not a forecast. Price points will be set from pilot data.</p>
+  </div>
+</section>
+
 <footer class="dark">
   <div class="wrap">
     <span class="muted">FIXCHAIN · independent hackathon project, not an official Paytm product · the demo uses a simulated gateway, no real money moves</span>
-    <span><a href="https://github.com/Gaganajain/FIXCHAIN">GitHub</a> · <a href="/" data-demo>Live demo</a></span>
+    <span><a href="https://github.com/Gaganajain/FIXCHAIN">GitHub</a> · <a href="/" data-demo>Live demo</a> · <a href="https://fixchain-ui-concept.vercel.app">New UI concept</a></span>
   </div>
 </footer>
 
