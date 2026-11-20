@@ -13,17 +13,40 @@ from pydantic import BaseModel, Field
 from . import config, db, detection, gateway, merchant_runtime, orchestrator
 from .agents import verifier
 
+from .ops import api as ops_api
+from .ops import auth as ops_auth
+from .ops import runtime as ops_runtime
+
+
 @asynccontextmanager
 async def lifespan(_app: FastAPI):
     db.init_db()
     merchant_runtime.ensure_workspace()
     orchestrator.recover_orphaned_runs()
+    ops_runtime.start()
     yield
+    ops_runtime.stop()
 
 
-app = FastAPI(title="FIXCHAIN", version="0.1.0", lifespan=lifespan,
-              description="Autonomous payment-integration reliability engineer (simulated environment)")
+app = FastAPI(title="FIXCHAIN", version="1.0.0", lifespan=lifespan,
+              description="AI incident intelligence, customer support and engineering remediation platform "
+                          "(simulated payment environment)")
 app.add_middleware(CORSMiddleware, allow_origins=config.CORS_ORIGINS, allow_methods=["*"], allow_headers=["*"])
+app.include_router(ops_api.router)
+
+
+@app.middleware("http")
+async def legacy_api_guard(request: Request, call_next):
+    """The original engineering endpoints (/api/*, not /api/v1) are open in demo mode for the dashboard and the
+    original test-suite. Outside demo mode they require a signed-in engineer/approver/admin session."""
+    p = request.url.path
+    if not ops_auth.DEMO_MODE and p.startswith("/api/") and not p.startswith("/api/v1/") and p != "/api/status":
+        from fastapi.responses import JSONResponse
+        auth = request.headers.get("authorization", "")
+        user = ops_auth.user_for_token(auth[7:].strip() if auth.lower().startswith("bearer ") else None)
+        if not user or not user.can("engineering:read"):
+            return JSONResponse({"detail": "Sign in with an engineering role"}, status_code=401)
+    return await call_next(request)
 
 
 # ------------------------------------------------------------------ models

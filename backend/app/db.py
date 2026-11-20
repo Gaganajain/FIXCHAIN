@@ -168,22 +168,43 @@ def connect() -> sqlite3.Connection:
     conn = sqlite3.connect(config.DB_PATH, timeout=30, check_same_thread=False)
     conn.row_factory = sqlite3.Row
     conn.execute("PRAGMA journal_mode=WAL")
+    # WAL + NORMAL: no corruption risk; on power loss only the last commits can be lost. Avoids an fsync per commit.
+    conn.execute("PRAGMA synchronous=NORMAL")
     conn.execute("PRAGMA foreign_keys=ON")
     return conn
 
 
+_local = threading.local()
+
+
+def _conn() -> sqlite3.Connection:
+    """One long-lived connection per thread (opening a connection costs ~2-3 ms on Windows). WAL keeps reads
+    concurrent across threads; writes stay serialised by _lock."""
+    path = str(config.DB_PATH)
+    c = getattr(_local, "conn", None)
+    if c is None or getattr(_local, "path", None) != path:
+        c = connect()
+        _local.conn, _local.path, _local.depth = c, path, 0
+    return c
+
+
 @contextmanager
 def tx() -> Iterator[sqlite3.Connection]:
+    """Write transaction. Re-entrant: a nested tx() on the same thread joins the outer transaction, and only the
+    outermost block commits or rolls back."""
     with _lock:
-        conn = connect()
+        conn = _conn()
+        _local.depth += 1
         try:
             yield conn
-            conn.commit()
+            if _local.depth == 1:
+                conn.commit()
         except Exception:
-            conn.rollback()
+            if _local.depth == 1:
+                conn.rollback()
             raise
         finally:
-            conn.close()
+            _local.depth -= 1
 
 
 def init_db() -> None:
@@ -200,11 +221,7 @@ def init_db() -> None:
 
 
 def rows(sql: str, params: tuple | list = ()) -> list[dict[str, Any]]:
-    conn = connect()
-    try:
-        return [dict(r) for r in conn.execute(sql, params).fetchall()]
-    finally:
-        conn.close()
+    return [dict(r) for r in _conn().execute(sql, params).fetchall()]
 
 
 def one(sql: str, params: tuple | list = ()) -> dict[str, Any] | None:
